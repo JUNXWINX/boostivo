@@ -1,13 +1,13 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { QRCodeSVG } from "qrcode.react";
 import { AlertTriangle, ArrowDownToLine, Check, Copy, Loader2, RefreshCw, LogOut } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { AppShell } from "@/components/AppShell";
-import { getMyProfile, getMyDeposits, getMyOrders, triggerTonCheck } from "@/lib/boostvari.functions";
+import { getMyProfile, getMyDeposits, triggerTonCheck } from "@/lib/boostvari.functions";
 import { useCurrency } from "@/lib/currency";
-import { formatNumber, formatPrice, formatTon } from "@/lib/format";
+import { formatPrice, formatTon } from "@/lib/format";
 import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/_authenticated/wallet")({
@@ -33,7 +33,25 @@ function WalletPage() {
   const { currency } = useCurrency();
   const { data: profile, isLoading } = useQuery({ queryKey: ["my-profile"], queryFn: () => getMyProfile() });
   const { data: deposits = [] } = useQuery({ queryKey: ["my-deposits"], queryFn: () => getMyDeposits() });
-  const { data: orders = [] } = useQuery({ queryKey: ["my-orders"], queryFn: () => getMyOrders() });
+
+  // Realtime: refresh balance + deposits when a new deposit lands
+  useEffect(() => {
+    let uid: string | null = null;
+    let channel: ReturnType<typeof supabase.channel> | null = null;
+    supabase.auth.getUser().then(({ data }) => {
+      uid = data.user?.id ?? null;
+      if (!uid) return;
+      channel = supabase
+        .channel("deposits-mine")
+        .on("postgres_changes", { event: "*", schema: "public", table: "deposits", filter: `user_id=eq.${uid}` },
+          () => {
+            qc.invalidateQueries({ queryKey: ["my-deposits"] });
+            qc.invalidateQueries({ queryKey: ["my-profile"] });
+          })
+        .subscribe();
+    });
+    return () => { if (channel) supabase.removeChannel(channel); };
+  }, [qc]);
 
   const tonCheckFn = useServerFn(triggerTonCheck);
   const refresh = useMutation({
@@ -145,54 +163,11 @@ function WalletPage() {
           )}
         </div>
 
-        {/* Orders history */}
-        <div className="rounded-3xl glass-strong p-5">
-          <h2 className="mb-3 text-base font-bold">Historique des commandes</h2>
-          {orders.length === 0 ? (
-            <p className="text-sm text-muted-foreground">
-              Aucune commande. <Link to="/" className="text-primary">Passez votre première commande →</Link>
-            </p>
-          ) : (
-            <ul className="divide-y divide-white/60">
-              {orders.map((o) => (
-                <li key={o.id} className="py-3 text-sm">
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="min-w-0">
-                      <p className="truncate font-semibold">{(o.service as { name?: string })?.name ?? "Service"}</p>
-                      <p className="text-[11px] text-muted-foreground">
-                        {formatNumber(o.quantity)} unités · {new Date(o.created_at).toLocaleDateString("fr-FR")}
-                      </p>
-                      <p className="truncate text-[11px] text-muted-foreground">{o.link}</p>
-                    </div>
-                    <div className="text-right">
-                      <p className="font-semibold">- {formatPrice(o.amount_ton, currency)}</p>
-                      <StatusBadge status={o.status} />
-                    </div>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
       </div>
     </AppShell>
   );
 }
 
-function StatusBadge({ status }: { status: string }) {
-  const cls =
-    status === "completed" || status === "sent" ? "bg-emerald-100 text-emerald-700"
-    : status === "paid" ? "bg-sky-100 text-sky-700"
-    : status === "pending" ? "bg-amber-100 text-amber-700"
-    : "bg-red-100 text-red-700";
-  const label =
-    status === "completed" ? "Terminée"
-    : status === "sent" ? "Envoyée"
-    : status === "paid" ? "Payée"
-    : status === "pending" ? "En attente"
-    : status === "failed" ? "Échec" : status;
-  return <span className={`mt-1 inline-block rounded-full px-2 py-0.5 text-[10px] font-medium ${cls}`}>{label}</span>;
-}
 
 function Field({ label, value, highlight, mono }: { label: string; value: string; highlight?: boolean; mono?: boolean }) {
   return (

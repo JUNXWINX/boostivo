@@ -23,8 +23,8 @@ export function AppShell({ children, right }: { children: ReactNode; right?: Rea
         </div>
         <nav className="mx-auto flex max-w-5xl items-center gap-1 px-3 pb-2 text-xs">
           <Link to="/" className="rounded-lg px-2.5 py-1 text-foreground/80 hover:bg-white/60" activeOptions={{ exact: true }} activeProps={{ className: "bg-white/70 text-foreground shadow-sm" }}>Acheter</Link>
+          <Link to="/orders" className="rounded-lg px-2.5 py-1 text-foreground/80 hover:bg-white/60" activeProps={{ className: "bg-white/70 text-foreground shadow-sm" }}>Mes commandes</Link>
           <Link to="/wallet" className="rounded-lg px-2.5 py-1 text-foreground/80 hover:bg-white/60" activeProps={{ className: "bg-white/70 text-foreground shadow-sm" }}>Portefeuille</Link>
-          <Link to="/track" className="rounded-lg px-2.5 py-1 text-foreground/80 hover:bg-white/60" activeProps={{ className: "bg-white/70 text-foreground shadow-sm" }}>Suivi</Link>
         </nav>
       </header>
       <main className="mx-auto max-w-5xl px-3 py-4 sm:px-4 sm:py-6">{children}</main>

@@ -1,95 +1,101 @@
-# Plan : UI ExoBooster + Système de solde utilisateur
+## Objectifs
 
-## Partie 1 — Refonte de la page commande (style ExoBooster)
+1. **Corriger le bug critique de prix** (priorité #1)
+2. Séparer historique des commandes / dépôts
+3. Supprimer la page `/track` et la remplacer par l'historique commandes live
+4. Adapter la remarque au service sélectionné (notamment Telegram canaux vs vues)
 
-Reproduire exactement la mise en page de la capture :
+---
 
-- Bandeau "CHOISISSEZ VOTRE RÉSEAU SOCIAL CIBLE" + rangée d'icônes plates centrées (TikTok, Instagram, Facebook, Telegram, YouTube, WhatsApp), l'icône active souligné par une bordure colorée.
-- Champs empilés simples (label gras au-dessus, input plein largeur) :
-  - **Service** (liste déroulante)
-  - **Type** (n'apparaît que si plusieurs qualités)
-  - **Lien du compte [Réseau]** (placeholder dynamique)
-  - **Quantité** + texte `(Min: X – Max: Y)` en dessous
-  - **Prix** affiché en pastille verte (montant total dans la devise choisie) + ligne `(X XOF / 1k Followers)` en dessous
-  - **Temps moyen de réalisation** (champ readonly)
-  - **Remarque** : zone d'aide avec règles 1/2/3 spécifiques au service
-- Bouton **Commander** sticky en bas.
+## 1. Bug de calcul de prix — racine identifiée
 
-### Correction du calcul de prix
-
-Vérifier la formule de bout en bout pour qu'à chaque changement de quantité, **prix XOF = (rate_per_1k_ton × xof_per_ton × quantité) / 1000** arrondi à l'unité, et **prix TON = (rate_per_1k_ton × quantité) / 1000** arrondi à 4 décimales. Recalculer immédiatement à chaque saisie sans décalage d'un tick.
-
-## Partie 2 — Comptes utilisateurs
-
-- Page `/auth` avec onglets **Connexion / Inscription** :
-  - Inscription : `username`, `email`, `password` + bouton œil pour afficher/masquer
-  - Vérification temps réel que l'username n'est pas déjà pris (debounced)
-  - Email de vérification envoyé via Lovable Auth (template par défaut)
-- Page `/reset-password` pour mot de passe oublié + formulaire nouveau mdp
-- Table `profiles` (user_id, username unique, balance_ton, preferred_currency 'XOF'|'USD', created_at)
-
-## Partie 3 — Solde et dépôts TON
-
-### Affichage solde (en haut de chaque page)
-
-Pastille verte type ExoBooster : `[+] 12 500 XOF` (cliquable → page Dépôt). Toggle FR/devise dans le header (XOF ↔ USD ↔ TON).
-
-### Page `/wallet` (Dépôt)
-
-1. Affiche l'adresse TON du wallet maître (copiable + QR code).
-2. **Memo unique par utilisateur** (généré une fois et stocké dans `profiles.deposit_memo`).
-3. Avertissement **EN ROUGE GRAS** : « ⚠️ IMPORTANT : Vous DEVEZ coller le memo `XXXX` avant de confirmer l'envoi. Sans ce memo, votre dépôt sera PERDU définitivement et irrécupérable. »
-4. Formulaire « J'ai envoyé X TON » qui force le scan immédiat.
-5. Historique des dépôts (en attente / confirmés).
-
-### Vérification automatique
-
-Le cron `/api/public/ton-check` existant est étendu : pour chaque tx entrante avec un memo qui matche `profiles.deposit_memo`, créditer `balance_ton` et insérer une ligne dans `deposits`. Déduplication via `ton_txs.hash`.
-
-### Paiement des commandes depuis le solde
-
-Au lieu de payer chaque commande on-chain, l'utilisateur connecté paie en débitant son solde TON. La commande passe direct en `paid` → `pushToProvider` (latence nulle). Les utilisateurs non connectés gardent le flow on-chain actuel.
-
-### Préférence d'affichage
-
-Setting `preferred_currency` dans `profiles` : choix entre `XOF` et `USD`. Tous les prix et le solde s'affichent dans cette devise + équivalent TON en secondaire partout. Taux USD/TON ajouté dans `settings` (ex. `usd_per_ton = 5.5`).
-
-## Schéma DB
-
-```text
-profiles
-  - user_id (uuid, pk, ref auth.users)
-  - username (text unique)
-  - balance_ton (numeric default 0)
-  - deposit_memo (text unique)
-  - preferred_currency (text default 'XOF')
-
-deposits
-  - user_id, amount_ton, tx_hash (unique), memo, status, created_at
-
-settings (ajouts)
-  - usd_per_ton
+Dans `src/lib/format.ts` :
+```ts
+export function formatXof(amount, rate) {
+  const xof = n < 10 ? tonToXof(n, rate) : Math.round(n);  // ← BUG
+  ...
+}
 ```
+Cette heuristique `n < 10` part du principe « si la valeur est petite c'est du TON, sinon c'est déjà du XOF ». Conséquence :
+- 5 000 abonnés TikTok → `priceTon = 9.94` → `< 10` → conversion OK → `32 813 XOF` ✅ (mathématiquement correct : 9.94 × 3300 ≈ 32 800)
+- 10 000 abonnés TikTok → `priceTon = 19.89` → `≥ 10` → **considéré comme déjà XOF** → affiche `20 XOF` ❌
 
-RLS : chaque utilisateur lit/écrit uniquement ses lignes ; le crédit du solde se fait via fonction SECURITY DEFINER appelée par le cron côté serveur.
+**Pourquoi tu vois aussi un souci à 5 000** : 32 813 XOF correspond bien à 9.94 TON au taux actuel (1 TON = 3 300 XOF), mais le **taux est probablement trop bas** par rapport au prix réel du TON aujourd'hui (≈ 2,30 USD ≈ 1 400 XOF, pas 3 300). Le ratio XOF↔TON paraît donc faux à l'œil même quand la conversion interne est correcte.
 
-## Hors scope (pour rester focus)
+### Correctifs
+- **Retirer toute heuristique** dans `formatXof` / `formatUsd` / `formatPrice` : la valeur d'entrée est **toujours en TON**, point. Conversion systématique via les taux.
+- **Mettre à jour les taux** dans `public.settings` aux valeurs marché actuelles (à confirmer avec toi — voir question ci-dessous) et synchroniser les constantes `XOF_PER_TON` / `USD_PER_TON` de `format.ts` pour qu'elles servent uniquement de fallback SSR.
+- **Vérifier en bout de chaîne** : afficher dans le formulaire la ligne de contrôle `quantité × rate_per_1k_ton / 1000 = priceTon` avec les trois devises pour qu'on voie qu'aucune divergence ne réapparaît.
 
-- Pas de retrait (TON → utilisateur) dans cette itération
-- Pas de 2FA
+---
+
+## 2. Séparer historique commandes / dépôts
+
+- **`/wallet`** : ne garde QUE le solde, l'adresse TON, le memo, l'avertissement rouge, et l'**historique des dépôts**.
+- Nouvelle page **`/orders`** (sous `_authenticated/`) : tableau live des commandes de l'utilisateur connecté, avec auto-refresh toutes les 15 s (Realtime Postgres + invalidation React Query).
+- Lien dédié dans le header (à côté de la pastille solde) → icône `ListOrdered` qui pointe vers `/orders`.
+- Après création d'une commande, redirection vers `/orders` (au lieu de `/order/$code` quand l'utilisateur est connecté) — la nouvelle ligne apparaît en tête de liste avec son statut en direct.
+
+---
+
+## 3. Supprimer `/track`
+
+Tu as raison : le seul but de `/track` était de retrouver une commande par son code public. Pour un utilisateur connecté, l'historique commandes le remplace entièrement.
+
+- Supprimer `src/routes/track.tsx` et le lien du header.
+- Garder `src/routes/order.$code.tsx` (page publique d'une commande individuelle par code) pour les **utilisateurs non connectés** qui paient en TON direct — c'est leur seul lien vers le statut + QR de paiement.
+- Pour les connectés, le bouton « Commander » mène directement à `/orders` (et la ligne y apparaît avec le même contenu que `/order/$code` en version compacte + lien « détails »).
+
+---
+
+## 4. Remarques adaptées au service
+
+Créer une fonction `getServiceRemarks(platform, serviceName)` dans `src/lib/platform.tsx` qui détecte le type d'action à partir du nom du service (abonnés, vues, likes, partages, commentaires, membres, etc.) et renvoie la bonne liste de remarques.
+
+Exemples ciblés :
+
+**Telegram — abonnés canal** :
+1. Mettez le lien du canal Telegram (public **ou** privé via lien d'invitation `t.me/+...`).
+2. Garantie anti-chute incluse.
+3. Ne supprimez pas le canal pendant l'exécution.
+
+**Telegram — vues** :
+1. Le canal **doit être public** (les vues ne s'appliquent qu'aux posts visibles).
+2. Le lien doit pointer vers un post précis (`t.me/canal/123`).
+3. Démarrage en quelques secondes.
+
+**Instagram / TikTok — abonnés** :
+1. Le compte doit être **public** pendant la livraison.
+2. Ne changez pas le nom d'utilisateur pendant l'exécution.
+3. Garantie anti-chute selon la qualité choisie.
+
+**Likes / Vues / Commentaires** : règles spécifiques (URL du post précis, post visible publiquement, etc.).
+
+Et un fallback générique pour les services non reconnus.
+
+---
 
 ## Détails techniques
 
-- Frontend : refonte de `src/routes/index.tsx` pour matcher 1:1 la capture ExoBooster (champs empilés, pastille verte, remarques).
-- `src/lib/format.ts` : ajouter `formatUsd`, helper `formatPrice(amount, currency)` unique pour éviter les divergences.
-- `src/routes/auth.tsx` : refonte avec onglets, check username via server fn, toggle password.
-- Nouveau `src/routes/_authenticated/wallet.tsx` : adresse + memo + QR + historique.
-- Nouveau `src/components/BalancePill.tsx` + currency switcher dans `AppShell`.
-- Migration : table `profiles`, `deposits`, fonctions `credit_balance`, `debit_balance`, trigger auto-create profile à l'inscription avec memo généré.
-- `processing.server.ts` étendu : si memo match un `profiles.deposit_memo`, créditer le solde au lieu de matcher une commande.
-- `createOrder` server fn : si user connecté avec solde suffisant, débiter + push immédiat ; sinon flow on-chain existant.
-- Email de vérification : utilise le flow Supabase Auth standard (déjà actif).
+| Fichier | Action |
+|---|---|
+| `src/lib/format.ts` | Supprimer heuristique `n < 10`. `formatXof`/`formatUsd`/`formatPrice` reçoivent toujours du TON. |
+| `src/lib/platform.tsx` | Ajouter `getServiceRemarks(platform, serviceName)` + détection type d'action. |
+| `src/routes/index.tsx` | Utiliser `getServiceRemarks`. Rediriger connecté → `/orders`. |
+| `src/routes/_authenticated/wallet.tsx` | Retirer la section commandes, garder dépôts. |
+| `src/routes/_authenticated/orders.tsx` | **Nouveau** — liste live des commandes user. |
+| `src/routes/track.tsx` | **Supprimer**. |
+| `src/components/AppShell.tsx` | Lien `/orders` dans le header pour les connectés, retirer lien `/track`. |
+| `src/lib/boostvari.functions.ts` | Ajouter `listMyOrders()` (déjà partiellement présent, à vérifier). |
+| `public.settings` (migration data) | Mettre à jour `xof_per_ton` / `usd_per_ton` aux taux corrects (après ta confirmation). |
 
-&nbsp;
+---
 
-Il doit y avoir l'historique de commande et l'historique de paiement précisément appelé Portefeuille et le solde doit être afficher dedans,et pour le solde je pense que tu comprends déjà quand il effectuer son dépôt c'est juste un affichage et chaque commande est déduit de ce solde tu comprends nn moi je reçois l'argent et comme j'avais déjà recharger mon compte API de exobooster la où les commandes seront payés mais avec le prix de exobooster genre leur plateforme 
+## Question avant de coder
+
+Pour le taux TON, il faut une valeur fiable. Trois options :
+- **A.** Je fixe des taux marché actuels en dur (≈ 1 TON = 2.30 USD = 1 400 XOF) et tu pourras les changer dans la table `settings`.
+- **B.** Je branche une mini fonction serveur qui interroge CoinGecko toutes les 10 min pour rafraîchir automatiquement `xof_per_ton` et `usd_per_ton` dans `settings`.
+- **C.** Tu me donnes toi-même les taux exacts à utiliser.
+
+Dis-moi laquelle tu préfères et je lance l'implémentation.
