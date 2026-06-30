@@ -242,14 +242,13 @@ function Home() {
             </div>
           </div>
 
-          {/* Remark */}
+          {/* Remark — adapté au service sélectionné */}
           <div className="rounded-2xl glass p-4">
             <p className="text-sm font-bold">Remarque :</p>
             <ol className="mt-2 list-decimal space-y-1.5 pl-5 text-xs text-foreground/80">
-              <li>Assurez-vous que le compte {info.name} n'est pas privé et ne changez pas le nom d'utilisateur pendant l'exécution.</li>
-              <li>Très faible chute des abonnés après livraison.</li>
-              <li>Une qualité élevée signifie une garantie plus longue et des comptes plus stables.</li>
-              <li>Livraison automatique dès réception du paiement (≈ 30 sec).</li>
+              {getServiceRemarks(platform, selected.name).map((r, i) => (
+                <li key={i}>{r}</li>
+              ))}
             </ol>
           </div>
 
