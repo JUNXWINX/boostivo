@@ -6,7 +6,7 @@ import { ChevronDown, Loader2 } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
 import { createOrder, getMyProfile, getRates, listServices } from "@/lib/boostvari.functions";
 import { formatNumber, formatPrice, formatTon } from "@/lib/format";
-import { getPlatform, PLATFORM_ORDER } from "@/lib/platform";
+import { getPlatform, getServiceRemarks, PLATFORM_ORDER } from "@/lib/platform";
 import { useCurrency } from "@/lib/currency";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -127,7 +127,8 @@ function Home() {
   const mutation = useMutation({
     mutationFn: () => createFn({ data: { service_id: selected!.id, link, quantity } }),
     onSuccess: (res) => {
-      if (res.paid_with_balance) navigate({ to: "/wallet" });
+      if (res.paid_with_balance) navigate({ to: "/orders" });
+      else if (signedIn) navigate({ to: "/orders" });
       else navigate({ to: "/order/$code", params: { code: res.public_code } });
     },
   });
