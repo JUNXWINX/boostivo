@@ -163,54 +163,11 @@ function WalletPage() {
           )}
         </div>
 
-        {/* Orders history */}
-        <div className="rounded-3xl glass-strong p-5">
-          <h2 className="mb-3 text-base font-bold">Historique des commandes</h2>
-          {orders.length === 0 ? (
-            <p className="text-sm text-muted-foreground">
-              Aucune commande. <Link to="/" className="text-primary">Passez votre première commande →</Link>
-            </p>
-          ) : (
-            <ul className="divide-y divide-white/60">
-              {orders.map((o) => (
-                <li key={o.id} className="py-3 text-sm">
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="min-w-0">
-                      <p className="truncate font-semibold">{(o.service as { name?: string })?.name ?? "Service"}</p>
-                      <p className="text-[11px] text-muted-foreground">
-                        {formatNumber(o.quantity)} unités · {new Date(o.created_at).toLocaleDateString("fr-FR")}
-                      </p>
-                      <p className="truncate text-[11px] text-muted-foreground">{o.link}</p>
-                    </div>
-                    <div className="text-right">
-                      <p className="font-semibold">- {formatPrice(o.amount_ton, currency)}</p>
-                      <StatusBadge status={o.status} />
-                    </div>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
       </div>
     </AppShell>
   );
 }
 
-function StatusBadge({ status }: { status: string }) {
-  const cls =
-    status === "completed" || status === "sent" ? "bg-emerald-100 text-emerald-700"
-    : status === "paid" ? "bg-sky-100 text-sky-700"
-    : status === "pending" ? "bg-amber-100 text-amber-700"
-    : "bg-red-100 text-red-700";
-  const label =
-    status === "completed" ? "Terminée"
-    : status === "sent" ? "Envoyée"
-    : status === "paid" ? "Payée"
-    : status === "pending" ? "En attente"
-    : status === "failed" ? "Échec" : status;
-  return <span className={`mt-1 inline-block rounded-full px-2 py-0.5 text-[10px] font-medium ${cls}`}>{label}</span>;
-}
 
 function Field({ label, value, highlight, mono }: { label: string; value: string; highlight?: boolean; mono?: boolean }) {
   return (
