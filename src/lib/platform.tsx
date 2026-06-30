@@ -10,8 +10,10 @@ import {
   Ghost,
   Headphones,
   Globe,
+  MessageCircle,
   type LucideIcon,
 } from "lucide-react";
+
 
 export type PlatformInfo = {
   name: string;
@@ -75,6 +77,15 @@ const DATA: Record<string, PlatformInfo> = {
     placeholder: "https://t.me/votre_canal",
     hint: "Canal ou groupe public. Le @username doit être accessible.",
   },
+  WhatsApp: {
+    name: "WhatsApp",
+    icon: MessageCircle,
+    color: "text-emerald-600",
+    tile: "from-emerald-500 to-green-600",
+    placeholder: "https://whatsapp.com/channel/...",
+    hint: "Chaîne ou groupe WhatsApp public (lien d'invitation).",
+  },
+
   Spotify: {
     name: "Spotify",
     icon: Headphones,
@@ -124,15 +135,17 @@ export function getPlatform(name?: string | null): PlatformInfo {
 
 /** Display order for grouping */
 export const PLATFORM_ORDER = [
-  "Instagram",
   "TikTok",
-  "YouTube",
-  "Telegram",
-  "Twitter",
+  "Instagram",
   "Facebook",
+  "Telegram",
+  "WhatsApp",
+  "YouTube",
+  "Twitter",
   "Snapchat",
   "Twitch",
   "Spotify",
   "LinkedIn",
   "Autre",
 ];
+
