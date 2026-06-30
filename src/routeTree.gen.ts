@@ -9,12 +9,30 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as TrackRouteImport } from './routes/track'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as ServiceIdRouteImport } from './routes/service.$id'
+import { Route as OrderCodeRouteImport } from './routes/order.$code'
 import { Route as ApiPublicTonCheckRouteImport } from './routes/api/public/ton-check'
 
+const TrackRoute = TrackRouteImport.update({
+  id: '/track',
+  path: '/track',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ServiceIdRoute = ServiceIdRouteImport.update({
+  id: '/service/$id',
+  path: '/service/$id',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const OrderCodeRoute = OrderCodeRouteImport.update({
+  id: '/order/$code',
+  path: '/order/$code',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiPublicTonCheckRoute = ApiPublicTonCheckRouteImport.update({
@@ -25,37 +43,81 @@ const ApiPublicTonCheckRoute = ApiPublicTonCheckRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/track': typeof TrackRoute
+  '/order/$code': typeof OrderCodeRoute
+  '/service/$id': typeof ServiceIdRoute
   '/api/public/ton-check': typeof ApiPublicTonCheckRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/track': typeof TrackRoute
+  '/order/$code': typeof OrderCodeRoute
+  '/service/$id': typeof ServiceIdRoute
   '/api/public/ton-check': typeof ApiPublicTonCheckRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/track': typeof TrackRoute
+  '/order/$code': typeof OrderCodeRoute
+  '/service/$id': typeof ServiceIdRoute
   '/api/public/ton-check': typeof ApiPublicTonCheckRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/api/public/ton-check'
+  fullPaths:
+    | '/'
+    | '/track'
+    | '/order/$code'
+    | '/service/$id'
+    | '/api/public/ton-check'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/api/public/ton-check'
-  id: '__root__' | '/' | '/api/public/ton-check'
+  to: '/' | '/track' | '/order/$code' | '/service/$id' | '/api/public/ton-check'
+  id:
+    | '__root__'
+    | '/'
+    | '/track'
+    | '/order/$code'
+    | '/service/$id'
+    | '/api/public/ton-check'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  TrackRoute: typeof TrackRoute
+  OrderCodeRoute: typeof OrderCodeRoute
+  ServiceIdRoute: typeof ServiceIdRoute
   ApiPublicTonCheckRoute: typeof ApiPublicTonCheckRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/track': {
+      id: '/track'
+      path: '/track'
+      fullPath: '/track'
+      preLoaderRoute: typeof TrackRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/service/$id': {
+      id: '/service/$id'
+      path: '/service/$id'
+      fullPath: '/service/$id'
+      preLoaderRoute: typeof ServiceIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/order/$code': {
+      id: '/order/$code'
+      path: '/order/$code'
+      fullPath: '/order/$code'
+      preLoaderRoute: typeof OrderCodeRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/public/ton-check': {
@@ -70,6 +132,9 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  TrackRoute: TrackRoute,
+  OrderCodeRoute: OrderCodeRoute,
+  ServiceIdRoute: ServiceIdRoute,
   ApiPublicTonCheckRoute: ApiPublicTonCheckRoute,
 }
 export const routeTree = rootRouteImport
