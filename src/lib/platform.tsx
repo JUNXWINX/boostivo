@@ -77,6 +77,15 @@ const DATA: Record<string, PlatformInfo> = {
     placeholder: "https://t.me/votre_canal",
     hint: "Canal ou groupe public. Le @username doit être accessible.",
   },
+  WhatsApp: {
+    name: "WhatsApp",
+    icon: MessageCircle,
+    color: "text-emerald-600",
+    tile: "from-emerald-500 to-green-600",
+    placeholder: "https://whatsapp.com/channel/...",
+    hint: "Chaîne ou groupe WhatsApp public (lien d'invitation).",
+  },
+
   Spotify: {
     name: "Spotify",
     icon: Headphones,
