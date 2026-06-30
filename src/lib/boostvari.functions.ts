@@ -144,7 +144,7 @@ export const triggerTonCheck = createServerFn({ method: "POST" }).handler(async 
 
 // --- Admin functions ---
 
-async function assertAdmin(ctx: { supabase: { rpc: (n: string, args: Record<string, unknown>) => Promise<{ data: unknown; error: unknown }> }; userId: string }) {
+async function assertAdmin(ctx: { userId: string }) {
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
   const { data, error } = await supabaseAdmin
     .from("user_roles")
