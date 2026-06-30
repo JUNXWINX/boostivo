@@ -27,18 +27,18 @@ export function tonToUsd(ton: number, rate = USD_PER_TON): number {
   return Math.round(ton * rate * 100) / 100;
 }
 
-export function formatXof(amount: number | string | null | undefined, rate = XOF_PER_TON): string {
-  const n = typeof amount === "string" ? parseFloat(amount) : amount ?? 0;
+/** Input is ALWAYS in TON. Converts to XOF using the rate. */
+export function formatXof(tonAmount: number | string | null | undefined, rate = XOF_PER_TON): string {
+  const n = typeof tonAmount === "string" ? parseFloat(tonAmount) : tonAmount ?? 0;
   if (!isFinite(n)) return "0 XOF";
-  const xof = n < 10 ? tonToXof(n, rate) : Math.round(n);
-  return `${formatNumber(xof)} XOF`;
+  return `${formatNumber(tonToXof(n, rate))} XOF`;
 }
 
-export function formatUsd(amount: number | string | null | undefined, rate = USD_PER_TON): string {
-  const n = typeof amount === "string" ? parseFloat(amount) : amount ?? 0;
+/** Input is ALWAYS in TON. Converts to USD using the rate. */
+export function formatUsd(tonAmount: number | string | null | undefined, rate = USD_PER_TON): string {
+  const n = typeof tonAmount === "string" ? parseFloat(tonAmount) : tonAmount ?? 0;
   if (!isFinite(n)) return "$0";
-  const usd = tonToUsd(n, rate);
-  return `$${formatNumber(usd)}`;
+  return `$${formatNumber(tonToUsd(n, rate))}`;
 }
 
 /** Format a TON amount in the chosen display currency. */
