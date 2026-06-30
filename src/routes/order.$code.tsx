@@ -6,7 +6,7 @@ import { Check, Copy, Loader2, RefreshCw } from "lucide-react";
 import { useState } from "react";
 import { AppShell } from "@/components/AppShell";
 import { getOrderByCode, triggerTonCheck } from "@/lib/boostvari.functions";
-import { formatTon } from "@/lib/format";
+import { formatTon, formatXof, formatNumber } from "@/lib/format";
 
 const orderQuery = (code: string) =>
   queryOptions({
@@ -98,7 +98,7 @@ function OrderPage() {
             </div>
             <div>
               <p className="text-xs text-muted-foreground">Quantité</p>
-              <p className="font-medium">{order.quantity.toLocaleString()}</p>
+              <p className="font-medium">{formatNumber(order.quantity)}</p>
             </div>
             <div className="col-span-2">
               <p className="text-xs text-muted-foreground">Lien</p>
@@ -111,7 +111,7 @@ function OrderPage() {
           <div className="rounded-2xl border border-primary/40 bg-gradient-to-br from-primary/15 to-transparent p-5 shadow-xl">
             <h2 className="text-base font-semibold">Paiement TON</h2>
             <p className="mt-1 text-xs text-muted-foreground">
-              Envoyez exactement <strong className="text-primary">{formatTon(order.amount_ton)}</strong> avec le mémo ci-dessous. Détection automatique sous 30s.
+              Envoyez exactement <strong className="text-primary">{formatTon(order.amount_ton)}</strong> (<strong>{formatXof(order.amount_ton)}</strong>) avec le mémo ci-dessous. Détection automatique sous 30s.
             </p>
 
             {tonLink && (
