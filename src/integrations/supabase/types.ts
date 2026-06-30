@@ -14,6 +14,39 @@ export type Database = {
   }
   public: {
     Tables: {
+      deposits: {
+        Row: {
+          amount_ton: number
+          created_at: string
+          from_addr: string | null
+          id: string
+          memo: string
+          status: string
+          tx_hash: string
+          user_id: string
+        }
+        Insert: {
+          amount_ton: number
+          created_at?: string
+          from_addr?: string | null
+          id?: string
+          memo: string
+          status?: string
+          tx_hash: string
+          user_id: string
+        }
+        Update: {
+          amount_ton?: number
+          created_at?: string
+          from_addr?: string | null
+          id?: string
+          memo?: string
+          status?: string
+          tx_hash?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       orders: {
         Row: {
           amount_ton: number
@@ -81,6 +114,36 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      profiles: {
+        Row: {
+          balance_ton: number
+          created_at: string
+          deposit_memo: string
+          preferred_currency: string
+          updated_at: string
+          user_id: string
+          username: string
+        }
+        Insert: {
+          balance_ton?: number
+          created_at?: string
+          deposit_memo: string
+          preferred_currency?: string
+          updated_at?: string
+          user_id: string
+          username: string
+        }
+        Update: {
+          balance_ton?: number
+          created_at?: string
+          deposit_memo?: string
+          preferred_currency?: string
+          updated_at?: string
+          user_id?: string
+          username?: string
+        }
+        Relationships: []
       }
       services: {
         Row: {
@@ -209,6 +272,15 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      credit_balance: {
+        Args: { _amount: number; _user: string }
+        Returns: undefined
+      }
+      debit_balance: {
+        Args: { _amount: number; _user: string }
+        Returns: boolean
+      }
+      generate_deposit_memo: { Args: never; Returns: string }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -216,6 +288,7 @@ export type Database = {
         }
         Returns: boolean
       }
+      is_username_available: { Args: { _username: string }; Returns: boolean }
     }
     Enums: {
       app_role: "admin" | "user"
