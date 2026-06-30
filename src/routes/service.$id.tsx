@@ -5,7 +5,7 @@ import { useMemo, useState } from "react";
 import { ArrowLeft, Loader2 } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
 import { createOrder, getService } from "@/lib/boostvari.functions";
-import { formatTon } from "@/lib/format";
+import { formatTon, formatXof, formatNumber } from "@/lib/format";
 
 const serviceQuery = (id: string) =>
   queryOptions({

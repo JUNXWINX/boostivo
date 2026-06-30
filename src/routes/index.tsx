@@ -4,7 +4,7 @@ import { useSuspenseQuery, queryOptions } from "@tanstack/react-query";
 import { Search, Zap } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
 import { listServices } from "@/lib/boostvari.functions";
-import { formatTon } from "@/lib/format";
+import { formatTon, formatXof, formatNumber } from "@/lib/format";
 
 const servicesQuery = queryOptions({
   queryKey: ["services"],
@@ -108,12 +108,13 @@ function Home() {
                   </div>
                   <h3 className="mt-1.5 line-clamp-2 text-sm font-medium leading-snug">{s.name}</h3>
                   <p className="mt-1 text-xs text-muted-foreground">
-                    Min {s.min_qty.toLocaleString()} · Max {s.max_qty.toLocaleString()}
+                    Min {formatNumber(s.min_qty)} · Max {formatNumber(s.max_qty)}
                   </p>
                 </div>
                 <div className="shrink-0 text-right">
-                  <div className="text-sm font-bold text-primary">{formatTon(s.rate_per_1k_ton)}</div>
+                  <div className="text-sm font-bold text-primary">{formatXof(s.rate_per_1k_ton)}</div>
                   <div className="text-[10px] text-muted-foreground">/ 1000</div>
+                  <div className="mt-0.5 text-[10px] text-muted-foreground/70">≈ {formatTon(s.rate_per_1k_ton)}</div>
                 </div>
               </Link>
             </li>
