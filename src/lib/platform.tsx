@@ -10,8 +10,10 @@ import {
   Ghost,
   Headphones,
   Globe,
+  MessageCircle,
   type LucideIcon,
 } from "lucide-react";
+
 
 export type PlatformInfo = {
   name: string;
