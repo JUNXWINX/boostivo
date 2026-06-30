@@ -1,13 +1,13 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { QRCodeSVG } from "qrcode.react";
 import { AlertTriangle, ArrowDownToLine, Check, Copy, Loader2, RefreshCw, LogOut } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { AppShell } from "@/components/AppShell";
-import { getMyProfile, getMyDeposits, getMyOrders, triggerTonCheck } from "@/lib/boostvari.functions";
+import { getMyProfile, getMyDeposits, triggerTonCheck } from "@/lib/boostvari.functions";
 import { useCurrency } from "@/lib/currency";
-import { formatNumber, formatPrice, formatTon } from "@/lib/format";
+import { formatPrice, formatTon } from "@/lib/format";
 import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/_authenticated/wallet")({
@@ -33,7 +33,25 @@ function WalletPage() {
   const { currency } = useCurrency();
   const { data: profile, isLoading } = useQuery({ queryKey: ["my-profile"], queryFn: () => getMyProfile() });
   const { data: deposits = [] } = useQuery({ queryKey: ["my-deposits"], queryFn: () => getMyDeposits() });
-  const { data: orders = [] } = useQuery({ queryKey: ["my-orders"], queryFn: () => getMyOrders() });
+
+  // Realtime: refresh balance + deposits when a new deposit lands
+  useEffect(() => {
+    let uid: string | null = null;
+    let channel: ReturnType<typeof supabase.channel> | null = null;
+    supabase.auth.getUser().then(({ data }) => {
+      uid = data.user?.id ?? null;
+      if (!uid) return;
+      channel = supabase
+        .channel("deposits-mine")
+        .on("postgres_changes", { event: "*", schema: "public", table: "deposits", filter: `user_id=eq.${uid}` },
+          () => {
+            qc.invalidateQueries({ queryKey: ["my-deposits"] });
+            qc.invalidateQueries({ queryKey: ["my-profile"] });
+          })
+        .subscribe();
+    });
+    return () => { if (channel) supabase.removeChannel(channel); };
+  }, [qc]);
 
   const tonCheckFn = useServerFn(triggerTonCheck);
   const refresh = useMutation({
