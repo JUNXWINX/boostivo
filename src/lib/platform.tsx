@@ -149,3 +149,141 @@ export const PLATFORM_ORDER = [
   "Autre",
 ];
 
+// ============== Service action detection + remarks ==============
+
+export type ActionKind =
+  | "subscribers"   // abonnés/followers de profil ou de canal
+  | "members"       // membres de groupe
+  | "views"         // vues vidéo/post/story
+  | "likes"         // likes/reactions
+  | "comments"
+  | "shares"
+  | "reactions"
+  | "votes"
+  | "plays"         // écoutes (Spotify, SoundCloud)
+  | "live"          // viewers live
+  | "other";
+
+export function detectAction(serviceName: string): ActionKind {
+  const n = serviceName.toLowerCase();
+  if (/\b(view|vue|vues|impression)/.test(n)) return "views";
+  if (/\b(like|j[' ]?aime|love|heart)/.test(n)) return "likes";
+  if (/\bcomment|commentaire/.test(n)) return "comments";
+  if (/\bshare|partage|repost|retweet/.test(n)) return "shares";
+  if (/\breaction|réaction/.test(n)) return "reactions";
+  if (/\bvote|poll|sondage/.test(n)) return "votes";
+  if (/\bplay|stream|écoute|ecoute/.test(n)) return "plays";
+  if (/\blive|viewer/.test(n)) return "live";
+  if (/\bmember|membre/.test(n)) return "members";
+  if (/\b(subscriber|follower|abonné|abonne|sub\b)/.test(n)) return "subscribers";
+  return "other";
+}
+
+/** Returns service-specific remarks (numbered list). */
+export function getServiceRemarks(platform: string, serviceName: string): string[] {
+  const action = detectAction(serviceName);
+
+  // -------- Telegram cases --------
+  if (platform === "Telegram") {
+    if (action === "subscribers") {
+      return [
+        "Mettez le lien du canal Telegram (public OU privé via lien d'invitation t.me/+...).",
+        "Le canal doit rester actif pendant toute la livraison.",
+        "Garantie anti-chute selon la qualité choisie.",
+        "Livraison automatique dès paiement confirmé.",
+      ];
+    }
+    if (action === "members") {
+      return [
+        "Mettez le lien du groupe Telegram (public ou lien d'invitation).",
+        "Ne supprimez pas le groupe pendant l'exécution.",
+        "Démarrage en quelques minutes après paiement.",
+      ];
+    }
+    if (action === "views") {
+      return [
+        "Le canal DOIT être public — les vues ne s'appliquent qu'aux posts visibles.",
+        "Le lien doit pointer vers un post précis (ex. t.me/votre_canal/123).",
+        "Démarrage en quelques secondes.",
+      ];
+    }
+    if (action === "reactions" || action === "votes") {
+      return [
+        "Le canal/post doit être public et accessible.",
+        "Lien direct du post (t.me/votre_canal/123).",
+        "Livraison instantanée après paiement.",
+      ];
+    }
+  }
+
+  // -------- WhatsApp --------
+  if (platform === "WhatsApp") {
+    return [
+      "Mettez le lien d'invitation de la chaîne ou du groupe WhatsApp.",
+      "Le lien doit rester actif jusqu'à la fin de la livraison.",
+      "Livraison automatique dès paiement.",
+    ];
+  }
+
+  // -------- Profile-based actions (Instagram/TikTok/X/Facebook/...) --------
+  if (action === "subscribers") {
+    return [
+      `Le compte ${platform} doit être PUBLIC pendant toute la livraison.`,
+      "Ne changez pas le nom d'utilisateur (@) pendant l'exécution.",
+      "Garantie anti-chute selon la qualité choisie (haute qualité = plus stable).",
+      "Livraison automatique dès paiement confirmé.",
+    ];
+  }
+  if (action === "likes" || action === "reactions") {
+    return [
+      "Collez le lien direct de la publication (pas du profil).",
+      "Le post doit être public et accessible.",
+      "Ne supprimez pas le post pendant l'exécution.",
+      "Démarrage en quelques minutes.",
+    ];
+  }
+  if (action === "views" || action === "plays") {
+    return [
+      "Collez le lien direct de la vidéo/publication.",
+      "Le contenu doit être public.",
+      "Démarrage très rapide après paiement.",
+    ];
+  }
+  if (action === "comments") {
+    return [
+      "Lien direct de la publication ciblée.",
+      "Les commentaires sont aléatoires et adaptés au contenu.",
+      "Démarrage en quelques minutes.",
+    ];
+  }
+  if (action === "shares") {
+    return [
+      "Lien direct du post à partager.",
+      "Le post doit être public.",
+      "Livraison progressive sur quelques heures.",
+    ];
+  }
+  if (action === "live") {
+    return [
+      "Lancez d'abord votre live, puis collez le lien.",
+      "Les viewers rejoignent pendant la durée du live.",
+      "À commander juste avant ou pendant le live.",
+    ];
+  }
+  if (action === "members") {
+    return [
+      "Lien d'invitation du groupe.",
+      "Le groupe doit accepter les nouveaux membres.",
+      "Démarrage en quelques minutes.",
+    ];
+  }
+
+  // -------- Fallback --------
+  return [
+    "Collez le lien complet et public correspondant au service.",
+    "Ne modifiez pas le contenu pendant l'exécution.",
+    "Livraison automatique dès paiement confirmé.",
+  ];
+}
+
+
