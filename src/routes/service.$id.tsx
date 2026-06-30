@@ -5,7 +5,7 @@ import { useMemo, useState } from "react";
 import { ArrowLeft, Loader2 } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
 import { createOrder, getService } from "@/lib/boostvari.functions";
-import { formatTon } from "@/lib/format";
+import { formatTon, formatXof, formatNumber } from "@/lib/format";
 
 const serviceQuery = (id: string) =>
   queryOptions({
@@ -51,10 +51,16 @@ function ServicePage() {
             {svc.platform || "—"}
           </span>
           <h1 className="mt-2 text-xl font-bold leading-tight">{svc.name}</h1>
-          <div className="mt-3 flex flex-wrap gap-4 text-xs text-muted-foreground">
-            <div>Tarif: <span className="font-semibold text-primary">{formatTon(svc.rate_per_1k_ton)}</span> / 1000</div>
-            <div>Min: {svc.min_qty.toLocaleString()}</div>
-            <div>Max: {svc.max_qty.toLocaleString()}</div>
+          <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
+            <div className="rounded-lg bg-background/40 px-3 py-2">
+              <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Tarif / 1000</div>
+              <div className="mt-0.5 font-bold text-primary">{formatXof(svc.rate_per_1k_ton)}</div>
+              <div className="text-[10px] text-muted-foreground/70">≈ {formatTon(svc.rate_per_1k_ton)}</div>
+            </div>
+            <div className="rounded-lg bg-background/40 px-3 py-2">
+              <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Quantité</div>
+              <div className="mt-0.5 font-medium">{formatNumber(svc.min_qty)} – {formatNumber(svc.max_qty)}</div>
+            </div>
           </div>
         </div>
 
@@ -75,7 +81,7 @@ function ServicePage() {
           </div>
           <div>
             <label className="mb-1.5 block text-xs font-medium text-muted-foreground">
-              Quantité ({svc.min_qty.toLocaleString()} – {svc.max_qty.toLocaleString()})
+              Quantité ({formatNumber(svc.min_qty)} – {formatNumber(svc.max_qty)})
             </label>
             <input
               type="number"
@@ -90,8 +96,9 @@ function ServicePage() {
           <div className="rounded-xl border border-primary/30 bg-primary/10 p-4">
             <div className="flex items-baseline justify-between">
               <span className="text-xs uppercase tracking-wider text-muted-foreground">Total à payer</span>
-              <span className="text-2xl font-bold text-primary">{formatTon(price)}</span>
+              <span className="text-2xl font-bold text-primary">{formatXof(price)}</span>
             </div>
+            <div className="mt-1 text-right text-xs text-muted-foreground">≈ {formatTon(price)}</div>
           </div>
 
           {mutation.isError && (
