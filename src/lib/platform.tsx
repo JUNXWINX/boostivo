@@ -135,15 +135,17 @@ export function getPlatform(name?: string | null): PlatformInfo {
 
 /** Display order for grouping */
 export const PLATFORM_ORDER = [
-  "Instagram",
   "TikTok",
-  "YouTube",
-  "Telegram",
-  "Twitter",
+  "Instagram",
   "Facebook",
+  "Telegram",
+  "WhatsApp",
+  "YouTube",
+  "Twitter",
   "Snapchat",
   "Twitch",
   "Spotify",
   "LinkedIn",
   "Autre",
 ];
+
