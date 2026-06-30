@@ -53,10 +53,10 @@ function statusLabel(s: string) {
 }
 
 function statusColor(s: string) {
-  if (s === "pending") return "bg-yellow-500/20 text-yellow-300 border-yellow-500/40";
-  if (s === "paid") return "bg-blue-500/20 text-blue-300 border-blue-500/40";
-  if (s === "sent" || s === "completed") return "bg-emerald-500/20 text-emerald-300 border-emerald-500/40";
-  if (s === "failed" || s === "cancelled") return "bg-destructive/20 text-destructive border-destructive/40";
+  if (s === "pending") return "bg-amber-100 text-amber-800 border-amber-300";
+  if (s === "paid") return "bg-sky-100 text-sky-800 border-sky-300";
+  if (s === "sent" || s === "completed") return "bg-emerald-100 text-emerald-800 border-emerald-300";
+  if (s === "failed" || s === "cancelled") return "bg-destructive/15 text-destructive border-destructive/40";
   return "bg-secondary";
 }
 
@@ -81,7 +81,7 @@ function OrderPage() {
   return (
     <AppShell>
       <div className="space-y-4">
-        <div className="rounded-2xl border border-border/60 bg-card p-5 shadow-xl">
+        <div className="rounded-3xl glass-strong p-5">
           <div className="flex items-start justify-between gap-3">
             <div>
               <p className="text-xs uppercase tracking-wider text-muted-foreground">Commande</p>
@@ -108,7 +108,7 @@ function OrderPage() {
         </div>
 
         {order.status === "pending" && (
-          <div className="rounded-2xl border border-primary/40 bg-gradient-to-br from-primary/15 to-transparent p-5 shadow-xl">
+          <div className="rounded-3xl glass-strong border border-primary/30 p-5">
             <h2 className="text-base font-semibold">Paiement TON</h2>
             <p className="mt-1 text-xs text-muted-foreground">
               Envoyez exactement <strong className="text-primary">{formatTon(order.amount_ton)}</strong> (<strong>{formatXof(order.amount_ton)}</strong>) avec le mémo ci-dessous. Détection automatique sous 30s.
@@ -147,8 +147,8 @@ function OrderPage() {
         )}
 
         {(order.status === "sent" || order.status === "completed") && order.provider_order_id && (
-          <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/5 p-4 text-sm">
-            ID fournisseur: <span className="font-mono text-emerald-300">{order.provider_order_id}</span>
+          <div className="rounded-2xl border border-emerald-300 bg-emerald-50 p-4 text-sm">
+            ID fournisseur: <span className="font-mono text-emerald-700">{order.provider_order_id}</span>
           </div>
         )}
       </div>
@@ -160,7 +160,7 @@ function Field({ label, value, highlight, mono }: { label: string; value: string
   return (
     <div>
       <p className="mb-1 text-xs text-muted-foreground">{label}</p>
-      <div className={`flex items-center gap-2 rounded-lg border px-3 py-2 ${highlight ? "border-primary/60 bg-primary/10" : "border-border bg-input"}`}>
+      <div className={`flex items-center gap-2 rounded-xl border px-3 py-2 ${highlight ? "border-primary/50 bg-primary/10" : "border-white/70 bg-white/80"}`}>
         <span className={`flex-1 break-all text-sm ${mono ? "font-mono" : ""}`}>{value}</span>
         <CopyButton value={value} />
       </div>
