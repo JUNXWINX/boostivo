@@ -3,14 +3,20 @@ import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { generateMemo, generatePublicCode } from "./format";
 
+function publicClient() {
+  // dynamic import keeps the supabase-js dep out of the SSR client bundle's top scope
+  return import("@supabase/supabase-js").then(({ createClient }) =>
+    createClient(
+      process.env.SUPABASE_URL!,
+      process.env.SUPABASE_PUBLISHABLE_KEY!,
+      { auth: { persistSession: false, autoRefreshToken: false } },
+    ),
+  );
+}
+
 // Public: list active services
 export const listServices = createServerFn({ method: "GET" }).handler(async () => {
-  const { createClient } = await import("@supabase/supabase-js");
-  const sb = createClient(
-    process.env.SUPABASE_URL!,
-    process.env.SUPABASE_PUBLISHABLE_KEY!,
-    { auth: { persistSession: false, autoRefreshToken: false } },
-  );
+  const sb = await publicClient();
   const { data, error } = await sb
     .from("services")
     .select("id, provider_id, name, category, platform, type, rate_per_1k_ton, min_qty, max_qty")
@@ -21,32 +27,95 @@ export const listServices = createServerFn({ method: "GET" }).handler(async () =
   return data ?? [];
 });
 
-// Public: get a single service
-export const getService = createServerFn({ method: "GET" })
-  .inputValidator((d: { id: string }) => z.object({ id: z.string().uuid() }).parse(d))
+// Public: rates (XOF/USD per TON)
+export const getRates = createServerFn({ method: "GET" }).handler(async () => {
+  const sb = await publicClient();
+  const { data } = await sb.from("settings").select("key, value").in("key", ["xof_per_ton", "usd_per_ton"]);
+  const map = new Map((data ?? []).map((r) => [r.key, Number(r.value)]));
+  return {
+    xof_per_ton: map.get("xof_per_ton") || 3300,
+    usd_per_ton: map.get("usd_per_ton") || 5.5,
+  };
+});
+
+// Public: username availability check
+export const checkUsername = createServerFn({ method: "GET" })
+  .inputValidator((d: { username: string }) =>
+    z.object({ username: z.string().min(3).max(24).regex(/^[a-z0-9_]+$/i) }).parse(d),
+  )
   .handler(async ({ data }) => {
-    const { createClient } = await import("@supabase/supabase-js");
-    const sb = createClient(
-      process.env.SUPABASE_URL!,
-      process.env.SUPABASE_PUBLISHABLE_KEY!,
-      { auth: { persistSession: false, autoRefreshToken: false } },
-    );
-    const { data: row, error } = await sb
-      .from("services")
-      .select("id, provider_id, name, category, platform, type, rate_per_1k_ton, min_qty, max_qty, active")
-      .eq("id", data.id)
-      .maybeSingle();
+    const sb = await publicClient();
+    const { data: ok, error } = await sb.rpc("is_username_available", { _username: data.username });
     if (error) throw new Error(error.message);
-    if (!row || !row.active) throw new Error("Service introuvable");
-    return row;
+    return { available: !!ok };
   });
 
-// Public: get TON receive address (display only)
+// Authenticated: my profile
+export const getMyProfile = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { data, error } = await context.supabase
+      .from("profiles")
+      .select("user_id, username, balance_ton, deposit_memo, preferred_currency, created_at")
+      .eq("user_id", context.userId)
+      .maybeSingle();
+    if (error) throw new Error(error.message);
+    if (!data) throw new Error("Profil introuvable");
+    return {
+      ...data,
+      balance_ton: Number(data.balance_ton),
+      ton_address: process.env.TON_RECEIVE_ADDRESS || "",
+    };
+  });
+
+export const updateMyCurrency = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { currency: string }) =>
+    z.object({ currency: z.enum(["XOF", "USD", "TON"]) }).parse(d),
+  )
+  .handler(async ({ context, data }) => {
+    const { error } = await context.supabase
+      .from("profiles")
+      .update({ preferred_currency: data.currency })
+      .eq("user_id", context.userId);
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
+// Authenticated: my deposits history
+export const getMyDeposits = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { data, error } = await context.supabase
+      .from("deposits")
+      .select("id, amount_ton, tx_hash, memo, from_addr, status, created_at")
+      .eq("user_id", context.userId)
+      .order("created_at", { ascending: false })
+      .limit(50);
+    if (error) throw new Error(error.message);
+    return (data ?? []).map((d) => ({ ...d, amount_ton: Number(d.amount_ton) }));
+  });
+
+// Authenticated: my orders history
+export const getMyOrders = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { data, error } = await context.supabase
+      .from("orders")
+      .select("id, public_code, link, quantity, amount_ton, status, created_at, sent_at, provider_order_id, service:services(name, platform)")
+      .eq("user_id", context.userId)
+      .order("created_at", { ascending: false })
+      .limit(50);
+    if (error) throw new Error(error.message);
+    return (data ?? []).map((o) => ({ ...o, amount_ton: Number(o.amount_ton) }));
+  });
+
+// Public: TON receive address
 export const getTonAddress = createServerFn({ method: "GET" }).handler(async () => {
   return { address: process.env.TON_RECEIVE_ADDRESS || "" };
 });
 
-// Public: create a pending order
+// ---- Order placement: balance-first when signed-in ----
 const createOrderSchema = z.object({
   service_id: z.string().uuid(),
   link: z.string().url().max(500),
@@ -57,6 +126,18 @@ export const createOrder = createServerFn({ method: "POST" })
   .inputValidator((d: unknown) => createOrderSchema.parse(d))
   .handler(async ({ data }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    // Try to extract auth user from request header
+    let userId: string | null = null;
+    try {
+      const { getRequestHeader } = await import("@tanstack/react-start/server");
+      const auth = getRequestHeader("authorization");
+      if (auth?.startsWith("Bearer ")) {
+        const token = auth.slice(7);
+        const { data: u } = await supabaseAdmin.auth.getUser(token);
+        userId = u?.user?.id ?? null;
+      }
+    } catch { /* anon flow */ }
 
     const { data: svc, error: svcErr } = await supabaseAdmin
       .from("services")
@@ -70,44 +151,65 @@ export const createOrder = createServerFn({ method: "POST" })
     }
 
     const amount = Math.max(
-      0.01,
+      0.0001,
       Math.round((Number(svc.rate_per_1k_ton) * data.quantity) / 1000 * 10000) / 10000,
     );
 
-    // Generate unique memo + code with collision retry
+    // generate unique memo/code
     let memo = generateMemo();
     let code = generatePublicCode();
     for (let i = 0; i < 5; i++) {
       const { data: ex } = await supabaseAdmin
-        .from("orders")
-        .select("id")
-        .or(`memo.eq.${memo},public_code.eq.${code}`)
-        .maybeSingle();
+        .from("orders").select("id")
+        .or(`memo.eq.${memo},public_code.eq.${code}`).maybeSingle();
       if (!ex) break;
       memo = generateMemo();
       code = generatePublicCode();
     }
 
+    // If user signed-in and has enough balance, debit & mark paid immediately
+    let usedBalance = false;
+    if (userId) {
+      const { data: ok } = await supabaseAdmin.rpc("debit_balance", { _user: userId, _amount: amount });
+      usedBalance = !!ok;
+    }
+
     const { data: inserted, error } = await supabaseAdmin
       .from("orders")
       .insert({
+        user_id: userId,
         service_id: data.service_id,
         link: data.link,
         quantity: data.quantity,
         amount_ton: amount,
         memo,
         public_code: code,
-        status: "pending",
+        status: usedBalance ? "paid" : "pending",
+        paid_at: usedBalance ? new Date().toISOString() : null,
       })
-      .select("id, public_code, memo, amount_ton")
+      .select("id, public_code, memo, amount_ton, status")
       .single();
-    if (error) throw new Error(error.message);
+    if (error) {
+      // refund if we debited but insert failed
+      if (usedBalance && userId) {
+        await supabaseAdmin.rpc("credit_balance", { _user: userId, _amount: amount });
+      }
+      throw new Error(error.message);
+    }
+
+    // push to provider if paid by balance
+    if (usedBalance) {
+      const { pushToProvider } = await import("./processing.server");
+      pushToProvider(inserted.id).catch((e) => console.error("[order] push failed", e));
+    }
 
     return {
       id: inserted.id,
       public_code: inserted.public_code,
       memo: inserted.memo,
       amount_ton: Number(inserted.amount_ton),
+      status: inserted.status,
+      paid_with_balance: usedBalance,
       ton_address: process.env.TON_RECEIVE_ADDRESS || "",
     };
   });
@@ -116,12 +218,7 @@ export const createOrder = createServerFn({ method: "POST" })
 export const getOrderByCode = createServerFn({ method: "GET" })
   .inputValidator((d: { code: string }) => z.object({ code: z.string().min(4).max(32) }).parse(d))
   .handler(async ({ data }) => {
-    const { createClient } = await import("@supabase/supabase-js");
-    const sb = createClient(
-      process.env.SUPABASE_URL!,
-      process.env.SUPABASE_PUBLISHABLE_KEY!,
-      { auth: { persistSession: false, autoRefreshToken: false } },
-    );
+    const sb = await publicClient();
     const { data: row, error } = await sb
       .from("orders")
       .select("id, public_code, memo, amount_ton, link, quantity, status, provider_order_id, created_at, paid_at, sent_at, service:services(name, platform)")
@@ -136,22 +233,16 @@ export const getOrderByCode = createServerFn({ method: "GET" })
     };
   });
 
-// Public: trigger TON check on-demand (idempotent; also runs via cron)
 export const triggerTonCheck = createServerFn({ method: "POST" }).handler(async () => {
   const { runTonCheck } = await import("./processing.server");
   return runTonCheck();
 });
 
-// --- Admin functions ---
-
+// ---- Admin ----
 async function assertAdmin(ctx: { userId: string }) {
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
   const { data, error } = await supabaseAdmin
-    .from("user_roles")
-    .select("role")
-    .eq("user_id", ctx.userId)
-    .eq("role", "admin")
-    .maybeSingle();
+    .from("user_roles").select("role").eq("user_id", ctx.userId).eq("role", "admin").maybeSingle();
   if (error) throw new Error(error.message);
   if (!data) throw new Error("Accès refusé");
 }
@@ -162,10 +253,8 @@ export const adminListOrders = createServerFn({ method: "GET" })
     await assertAdmin(context);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data, error } = await supabaseAdmin
-      .from("orders")
-      .select("*, service:services(name, platform, provider_id)")
-      .order("created_at", { ascending: false })
-      .limit(200);
+      .from("orders").select("*, service:services(name, platform, provider_id)")
+      .order("created_at", { ascending: false }).limit(200);
     if (error) throw new Error(error.message);
     return data ?? [];
   });
@@ -175,9 +264,7 @@ export const adminStats = createServerFn({ method: "GET" })
   .handler(async ({ context }) => {
     await assertAdmin(context);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { data } = await supabaseAdmin
-      .from("orders")
-      .select("status, amount_ton, created_at");
+    const { data } = await supabaseAdmin.from("orders").select("status, amount_ton, created_at");
     const rows = data ?? [];
     const total = rows.length;
     const paidPlus = rows.filter((r) => ["paid", "sent", "completed"].includes(r.status as string));
@@ -196,8 +283,8 @@ export const adminSyncServices = createServerFn({ method: "POST" })
 
     const { data: settings } = await supabaseAdmin.from("settings").select("key, value");
     const settingsMap = new Map((settings ?? []).map((s) => [s.key, s.value]));
-    const markup = Number(settingsMap.get("markup_percent") ?? "30") / 100;
-    const tonUsd = Number(settingsMap.get("ton_price_usd") ?? "5.5");
+    const markup = Number(settingsMap.get("markup_percent") ?? "212.5") / 100;
+    const tonUsd = Number(settingsMap.get("ton_price_usd") ?? settingsMap.get("usd_per_ton") ?? "5.5");
 
     const services = await fetchServices();
     let upserted = 0;
@@ -210,18 +297,12 @@ export const adminSyncServices = createServerFn({ method: "POST" })
       const { error } = await supabaseAdmin.from("services").upsert(
         {
           provider_id: String(s.service),
-          name,
-          category: s.category ?? null,
-          type: s.type ?? null,
-          platform,
+          name, category: s.category ?? null, type: s.type ?? null, platform,
           rate_per_1k: rateUsd,
           rate_per_1k_ton: Number(ratePerKTon.toFixed(6)),
-          min_qty: Number(s.min) || 1,
-          max_qty: Number(s.max) || 1_000_000,
-          active: true,
-          updated_at: new Date().toISOString(),
-        },
-        { onConflict: "provider_id" },
+          min_qty: Number(s.min) || 1, max_qty: Number(s.max) || 1_000_000,
+          active: true, updated_at: new Date().toISOString(),
+        }, { onConflict: "provider_id" },
       );
       if (!error) upserted++;
     }
@@ -244,10 +325,8 @@ export const adminMarkPaid = createServerFn({ method: "POST" })
     await assertAdmin(context);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { error } = await supabaseAdmin
-      .from("orders")
-      .update({ status: "paid", paid_at: new Date().toISOString() })
-      .eq("id", data.id)
-      .eq("status", "pending");
+      .from("orders").update({ status: "paid", paid_at: new Date().toISOString() })
+      .eq("id", data.id).eq("status", "pending");
     if (error) throw new Error(error.message);
     const { pushToProvider } = await import("./processing.server");
     return pushToProvider(data.id);

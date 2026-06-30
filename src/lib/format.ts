@@ -7,27 +7,50 @@ export function formatNumber(n: number | string | null | undefined): string {
   return (num < 0 ? "-" : "") + (dec ? `${withSep},${dec}` : withSep);
 }
 
+export type Currency = "XOF" | "USD" | "TON";
+
+// Default rates (kept in sync with DB settings: xof_per_ton, usd_per_ton)
+export const XOF_PER_TON = 3300;
+export const USD_PER_TON = 5.5;
+
 export function formatTon(amount: number | string | null | undefined): string {
   const n = typeof amount === "string" ? parseFloat(amount) : amount ?? 0;
   if (!isFinite(n)) return "0 TON";
-  return `${n.toFixed(n < 1 ? 4 : 2)} TON`;
+  if (n === 0) return "0 TON";
+  return `${n < 1 ? n.toFixed(4) : n.toFixed(2)} TON`;
 }
 
-// XOF rate per TON (kept in sync with DB setting `xof_per_ton`)
-export const XOF_PER_TON = 3300;
-
-export function tonToXof(ton: number | string | null | undefined, rate = XOF_PER_TON): number {
-  const n = typeof ton === "string" ? parseFloat(ton) : ton ?? 0;
-  if (!isFinite(n)) return 0;
-  return Math.round(n * rate);
+export function tonToXof(ton: number, rate = XOF_PER_TON): number {
+  return Math.round(ton * rate);
+}
+export function tonToUsd(ton: number, rate = USD_PER_TON): number {
+  return Math.round(ton * rate * 100) / 100;
 }
 
 export function formatXof(amount: number | string | null | undefined, rate = XOF_PER_TON): string {
-  // If given a small number (<10), treat as TON and convert. Otherwise treat as XOF.
   const n = typeof amount === "string" ? parseFloat(amount) : amount ?? 0;
   if (!isFinite(n)) return "0 XOF";
   const xof = n < 10 ? tonToXof(n, rate) : Math.round(n);
   return `${formatNumber(xof)} XOF`;
+}
+
+export function formatUsd(amount: number | string | null | undefined, rate = USD_PER_TON): string {
+  const n = typeof amount === "string" ? parseFloat(amount) : amount ?? 0;
+  if (!isFinite(n)) return "$0";
+  const usd = tonToUsd(n, rate);
+  return `$${formatNumber(usd)}`;
+}
+
+/** Format a TON amount in the chosen display currency. */
+export function formatPrice(
+  ton: number,
+  currency: Currency,
+  rates?: { xof?: number; usd?: number },
+): string {
+  if (!isFinite(ton)) ton = 0;
+  if (currency === "TON") return formatTon(ton);
+  if (currency === "USD") return formatUsd(ton, rates?.usd ?? USD_PER_TON);
+  return formatXof(ton, rates?.xof ?? XOF_PER_TON);
 }
 
 export function generateMemo(): string {

@@ -1,66 +1,71 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { useSuspenseQuery, queryOptions } from "@tanstack/react-query";
-import { useMutation } from "@tanstack/react-query";
+import { useSuspenseQuery, queryOptions, useMutation, useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { ChevronDown, Info, Loader2, ShieldCheck, Sparkles, Zap } from "lucide-react";
+import { ChevronDown, Loader2 } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
-import { createOrder, listServices } from "@/lib/boostvari.functions";
-import { formatTon, formatXof, formatNumber } from "@/lib/format";
+import { createOrder, getMyProfile, getRates, listServices } from "@/lib/boostvari.functions";
+import { formatNumber, formatPrice, formatTon } from "@/lib/format";
 import { getPlatform, PLATFORM_ORDER } from "@/lib/platform";
+import { useCurrency } from "@/lib/currency";
+import { supabase } from "@/integrations/supabase/client";
 
-const servicesQuery = queryOptions({
-  queryKey: ["services"],
-  queryFn: () => listServices(),
-});
+const servicesQuery = queryOptions({ queryKey: ["services"], queryFn: () => listServices() });
+const ratesQuery = queryOptions({ queryKey: ["rates"], queryFn: () => getRates() });
 
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "Boostvari — SMM Panel automatique en TON" },
+      { title: "Boostvari — SMM Panel TON" },
       { name: "description", content: "Achetez followers, likes, vues. Paiement TON, livraison auto." },
-      { property: "og:title", content: "Boostvari — SMM Panel TON" },
-      { property: "og:description", content: "Followers, likes, vues — paiement TON, livraison instantanée." },
     ],
   }),
-  loader: ({ context }) => context.queryClient.ensureQueryData(servicesQuery),
+  loader: ({ context }) => Promise.all([
+    context.queryClient.ensureQueryData(servicesQuery),
+    context.queryClient.ensureQueryData(ratesQuery),
+  ]),
   component: Home,
-  errorComponent: ({ error }) => (
-    <AppShell><div className="p-6 text-destructive">Erreur: {error.message}</div></AppShell>
-  ),
+  errorComponent: ({ error }) => (<AppShell><div className="p-6 text-destructive">Erreur: {error.message}</div></AppShell>),
   notFoundComponent: () => <AppShell><div>Introuvable</div></AppShell>,
 });
 
 type Service = Awaited<ReturnType<typeof listServices>>[number];
 
-// Decode HTML entities (provider returns &#039; etc.)
 function decode(s: string): string {
-  return s
-    .replace(/&#0?39;/g, "'")
-    .replace(/&amp;/g, "&")
-    .replace(/&quot;/g, '"')
-    .replace(/&lt;/g, "<")
-    .replace(/&gt;/g, ">");
+  return s.replace(/&#0?39;/g, "'").replace(/&amp;/g, "&").replace(/&quot;/g, '"').replace(/&lt;/g, "<").replace(/&gt;/g, ">");
 }
-
-// Extract quality / variant label from name (text in trailing parentheses)
 function extractVariant(name: string): { base: string; variant: string } {
   const n = decode(name).trim();
   const m = n.match(/^(.*?)\s*\(([^()]+)\)\s*$/);
   if (m) return { base: m[1].trim(), variant: m[2].trim() };
   return { base: n, variant: "Standard" };
 }
-
 function groupKey(s: Service): string {
   return (s.category && s.category.trim()) || extractVariant(s.name).base;
 }
 
 function Home() {
   const { data: services } = useSuspenseQuery(servicesQuery);
+  const { data: rates } = useSuspenseQuery(ratesQuery);
+  const { currency } = useCurrency();
   const navigate = useNavigate();
   const createFn = useServerFn(createOrder);
 
-  // Group: platform -> serviceGroup (category) -> variants[]
+  // signed-in?
+  const [signedIn, setSignedIn] = useState<boolean | null>(null);
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data }) => setSignedIn(!!data.session));
+    const { data: sub } = supabase.auth.onAuthStateChange((_e, s) => setSignedIn(!!s));
+    return () => sub.subscription.unsubscribe();
+  }, []);
+
+  const { data: profile } = useQuery({
+    queryKey: ["my-profile"],
+    queryFn: () => getMyProfile(),
+    enabled: signedIn === true,
+  });
+
+  // Group: platform -> category -> variants[]
   const byPlatform = useMemo(() => {
     const map = new Map<string, Map<string, Service[]>>();
     for (const s of services) {
@@ -85,68 +90,58 @@ function Home() {
   }, [byPlatform]);
 
   const [platform, setPlatform] = useState<string>("");
-  useEffect(() => {
-    if (!platform && platforms[0]) setPlatform(platforms[0]);
-  }, [platforms, platform]);
+  useEffect(() => { if (!platform && platforms[0]) setPlatform(platforms[0]); }, [platforms, platform]);
 
   const groups = byPlatform.get(platform) ?? new Map<string, Service[]>();
   const groupNames = useMemo(() => Array.from(groups.keys()).sort(), [groups]);
 
   const [serviceGroup, setServiceGroup] = useState<string>("");
-  useEffect(() => { setServiceGroup(groupNames[0] ?? ""); }, [platform, groupNames.join("|")]);
+  useEffect(() => { setServiceGroup(groupNames[0] ?? ""); /* eslint-disable-next-line */ }, [platform, groupNames.join("|")]);
 
   const variants = groups.get(serviceGroup) ?? [];
   const variantOpts = useMemo(
-    () => variants.map((v) => ({ svc: v, ...extractVariant(v.name) })).sort((a, b) => Number(a.svc.rate_per_1k_ton) - Number(b.svc.rate_per_1k_ton)),
+    () => variants.map((v) => ({ svc: v, ...extractVariant(v.name) }))
+      .sort((a, b) => Number(a.svc.rate_per_1k_ton) - Number(b.svc.rate_per_1k_ton)),
     [variants],
   );
 
   const [variantId, setVariantId] = useState<string>("");
-  useEffect(() => { setVariantId(variantOpts[0]?.svc.id ?? ""); }, [serviceGroup, variantOpts.length]);
+  useEffect(() => { setVariantId(variantOpts[0]?.svc.id ?? ""); /* eslint-disable-next-line */ }, [serviceGroup, variantOpts.length]);
 
   const selected = variantOpts.find((v) => v.svc.id === variantId)?.svc ?? variantOpts[0]?.svc;
   const info = getPlatform(platform);
   const Icon = info.icon;
 
   const [link, setLink] = useState("");
-  const [quantity, setQuantity] = useState(0);
+  const [quantity, setQuantity] = useState<number>(0);
   useEffect(() => { if (selected) setQuantity(selected.min_qty); }, [selected?.id]);
 
-  const price = useMemo(
-    () => (selected ? (Number(selected.rate_per_1k_ton) * quantity) / 1000 : 0),
+  const priceTon = useMemo(
+    () => (selected ? (Number(selected.rate_per_1k_ton) * Math.max(0, quantity)) / 1000 : 0),
     [selected, quantity],
   );
+  const rateRow = selected ? Number(selected.rate_per_1k_ton) : 0;
+  const balanceTon = profile ? Number(profile.balance_ton) : 0;
+  const canPayFromBalance = signedIn && balanceTon >= priceTon && priceTon > 0;
 
   const mutation = useMutation({
     mutationFn: () => createFn({ data: { service_id: selected!.id, link, quantity } }),
-    onSuccess: (res) => navigate({ to: "/order/$code", params: { code: res.public_code } }),
+    onSuccess: (res) => {
+      if (res.paid_with_balance) navigate({ to: "/wallet" });
+      else navigate({ to: "/order/$code", params: { code: res.public_code } });
+    },
   });
 
   const valid = !!selected && link.trim().length > 5 && quantity >= selected.min_qty && quantity <= selected.max_qty;
 
   return (
     <AppShell>
-      <section className="mb-5 overflow-hidden rounded-3xl glass-strong p-5">
-        <div className="flex items-start gap-3">
-          <div className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-primary to-sky-400 text-primary-foreground shadow-lg shadow-primary/30">
-            <Zap className="h-5 w-5" />
-          </div>
-          <div className="min-w-0">
-            <h1 className="text-xl font-bold leading-tight sm:text-2xl">Boostez vos réseaux. Payez en TON.</h1>
-            <p className="mt-1 text-xs text-muted-foreground sm:text-sm">Commande automatique, livraison dès paiement détecté on-chain.</p>
-          </div>
-        </div>
-        <div className="mt-3 flex items-center gap-2 text-[11px] text-muted-foreground">
-          <Sparkles className="h-3.5 w-3.5 text-primary" /> {services.length} services · {platforms.length} réseaux
-        </div>
-      </section>
-
-      {/* Platform icons row */}
-      <div className="mb-5 rounded-3xl glass p-3">
-        <p className="mb-2 px-1 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-          Choisissez votre réseau
+      {/* Network picker */}
+      <div className="mb-4 rounded-3xl glass-strong p-4">
+        <p className="mb-3 text-center text-[12px] font-bold uppercase tracking-wider text-foreground/80">
+          Choisissez votre réseau social cible :
         </p>
-        <div className="flex flex-wrap justify-center gap-2 pb-1">
+        <div className="flex flex-wrap justify-center gap-2">
           {platforms.map((p) => {
             const pi = getPlatform(p);
             const PIcon = pi.icon;
@@ -158,137 +153,127 @@ function Home() {
                 aria-label={pi.name}
                 title={pi.name}
                 onClick={() => setPlatform(p)}
-                className={`grid h-14 w-14 shrink-0 place-items-center rounded-2xl bg-gradient-to-br ${pi.tile} text-white transition ${
-                  active
-                    ? "scale-105 ring-2 ring-primary ring-offset-2 ring-offset-white shadow-lg"
-                    : "opacity-70 hover:opacity-100"
+                className={`grid h-12 w-12 place-items-center rounded-2xl bg-gradient-to-br ${pi.tile} text-white transition ${
+                  active ? "scale-110 ring-2 ring-primary ring-offset-2 ring-offset-white shadow-lg" : "opacity-70 hover:opacity-100"
                 }`}
               >
-                <PIcon className="h-7 w-7" />
+                <PIcon className="h-6 w-6" />
               </button>
             );
           })}
         </div>
       </div>
 
-      {/* Configurator */}
+      {/* Form */}
       {selected ? (
-        <form
-          onSubmit={(e) => { e.preventDefault(); if (valid) mutation.mutate(); }}
-          className="overflow-hidden rounded-3xl glass-strong"
-        >
-          <div className="flex items-center gap-3 border-b border-white/60 p-4">
-            <span className={`grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-gradient-to-br ${info.tile} text-white shadow-md`}>
-              <Icon className="h-5 w-5" />
+        <form onSubmit={(e) => { e.preventDefault(); if (valid) mutation.mutate(); }} className="space-y-4">
+          <Field label="Service :">
+            <Select
+              value={serviceGroup}
+              onChange={setServiceGroup}
+              options={groupNames.map((g) => ({ value: g, label: decode(g) }))}
+              accent
+            />
+          </Field>
+
+          {variantOpts.length > 1 && (
+            <Field label="Type :">
+              <Select
+                value={variantId}
+                onChange={setVariantId}
+                options={variantOpts.map((v) => ({
+                  value: v.svc.id,
+                  label: `${v.variant} — ${formatPrice(Number(v.svc.rate_per_1k_ton), currency, { xof: rates.xof_per_ton, usd: rates.usd_per_ton })} / 1k`,
+                }))}
+              />
+            </Field>
+          )}
+
+          <Field label={`Le lien du compte ${info.name} :`}>
+            <input
+              type="url"
+              value={link}
+              onChange={(e) => setLink(e.target.value)}
+              placeholder={info.placeholder}
+              required
+              className="w-full rounded-xl border border-white/70 bg-white/90 px-3 py-3 text-sm outline-none ring-primary focus:ring-2"
+            />
+          </Field>
+
+          <Field label="Quantité :">
+            <input
+              type="number"
+              min={selected.min_qty}
+              max={selected.max_qty}
+              value={quantity}
+              onChange={(e) => setQuantity(Math.max(0, parseInt(e.target.value) || 0))}
+              className="w-full rounded-xl border border-white/70 bg-white/90 px-3 py-3 text-sm outline-none ring-primary focus:ring-2"
+            />
+            <p className="mt-1 text-xs text-muted-foreground">
+              (Min : {formatNumber(selected.min_qty)} – Max : {formatNumber(selected.max_qty)})
+            </p>
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              {[selected.min_qty, 500, 1000, 5000, 10000, 50000]
+                .filter((v, i, a) => v >= selected.min_qty && v <= selected.max_qty && a.indexOf(v) === i)
+                .slice(0, 6)
+                .map((v) => (
+                  <button
+                    type="button" key={v} onClick={() => setQuantity(v)}
+                    className={`rounded-full px-2.5 py-1 text-[11px] font-medium transition ${
+                      quantity === v ? "bg-primary text-primary-foreground" : "bg-white/70 hover:bg-white"
+                    }`}
+                  >
+                    {formatNumber(v)}
+                  </button>
+                ))}
+            </div>
+          </Field>
+
+          {/* Price */}
+          <div className="flex flex-wrap items-center gap-3 rounded-2xl glass p-4">
+            <span className="text-sm font-bold">Prix :</span>
+            <span className="rounded-lg bg-emerald-500 px-4 py-2 text-lg font-bold text-white shadow">
+              {formatPrice(priceTon, currency, { xof: rates.xof_per_ton, usd: rates.usd_per_ton })}
             </span>
-            <div>
-              <div className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Réseau</div>
-              <div className="text-base font-bold">{info.name}</div>
+            <span className="text-xs text-muted-foreground">≈ {formatTon(priceTon)}</span>
+            <div className="basis-full text-xs text-muted-foreground">
+              ({formatPrice(rateRow, currency, { xof: rates.xof_per_ton, usd: rates.usd_per_ton })} / 1k {decode(serviceGroup).toLowerCase()})
             </div>
           </div>
 
-          <div className="space-y-4 p-5">
-            {/* Service select */}
-            <Field label="Service">
-              <Select
-                value={serviceGroup}
-                onChange={setServiceGroup}
-                options={groupNames.map((g) => ({ value: g, label: decode(g) }))}
-              />
-            </Field>
+          {/* Remark */}
+          <div className="rounded-2xl glass p-4">
+            <p className="text-sm font-bold">Remarque :</p>
+            <ol className="mt-2 list-decimal space-y-1.5 pl-5 text-xs text-foreground/80">
+              <li>Assurez-vous que le compte {info.name} n'est pas privé et ne changez pas le nom d'utilisateur pendant l'exécution.</li>
+              <li>Très faible chute des abonnés après livraison.</li>
+              <li>Une qualité élevée signifie une garantie plus longue et des comptes plus stables.</li>
+              <li>Livraison automatique dès réception du paiement (≈ 30 sec).</li>
+            </ol>
+          </div>
 
-            {/* Type / quality select — only when multiple variants */}
-            {variantOpts.length > 1 && (
-              <Field label="Type / Qualité">
-                <Select
-                  value={variantId}
-                  onChange={setVariantId}
-                  options={variantOpts.map((v) => ({
-                    value: v.svc.id,
-                    label: `${v.variant} — ${formatXof(v.svc.rate_per_1k_ton)} / 1k`,
-                  }))}
-                />
-                <p className="mt-1.5 text-[11px] text-muted-foreground">
-                  {variantOpts.length} qualités disponibles, prix par 1000.
-                </p>
-              </Field>
-            )}
-
-            {/* Link */}
-            <Field label={`Lien ${info.name === "Autre" ? "" : info.name}`}>
-              <input
-                type="url"
-                value={link}
-                onChange={(e) => setLink(e.target.value)}
-                placeholder={info.placeholder}
-                required
-                className="w-full rounded-xl border border-white/70 bg-white/80 px-3 py-2.5 text-sm outline-none ring-primary focus:ring-2"
-              />
-              <p className="mt-1.5 flex items-start gap-1 text-[11px] text-muted-foreground">
-                <Info className="mt-0.5 h-3 w-3 shrink-0" /> {info.hint}
-              </p>
-            </Field>
-
-            {/* Quantity */}
-            <Field label={`Quantité (${formatNumber(selected.min_qty)} – ${formatNumber(selected.max_qty)})`}>
-              <input
-                type="number"
-                min={selected.min_qty}
-                max={selected.max_qty}
-                value={quantity}
-                onChange={(e) => setQuantity(Math.max(selected.min_qty, parseInt(e.target.value) || 0))}
-                className="w-full rounded-xl border border-white/70 bg-white/80 px-3 py-2.5 text-sm outline-none ring-primary focus:ring-2"
-              />
-              <div className="mt-2 flex flex-wrap gap-1.5">
-                {[selected.min_qty, 100, 500, 1000, 5000, 10000]
-                  .filter((v, i, a) => v >= selected.min_qty && v <= selected.max_qty && a.indexOf(v) === i)
-                  .slice(0, 6)
-                  .map((v) => (
-                    <button
-                      type="button"
-                      key={v}
-                      onClick={() => setQuantity(v)}
-                      className={`rounded-full px-2.5 py-1 text-[11px] font-medium transition ${
-                        quantity === v ? "bg-primary text-primary-foreground" : "bg-white/70 text-foreground hover:bg-white"
-                      }`}
-                    >
-                      {formatNumber(v)}
-                    </button>
-                  ))}
-              </div>
-            </Field>
-
-            {/* Total */}
-            <div className="rounded-2xl border border-primary/30 bg-gradient-to-br from-primary/10 to-sky-200/40 p-4">
-              <div className="flex items-baseline justify-between">
-                <span className="text-xs uppercase tracking-wider text-muted-foreground">Total à payer</span>
-                <span className="text-2xl font-bold text-primary">{formatXof(price)}</span>
-              </div>
-              <div className="mt-1 flex items-center justify-between text-[11px] text-muted-foreground">
-                <span>{formatXof(selected.rate_per_1k_ton)} / 1 000</span>
-                <span>≈ {formatTon(price)}</span>
-              </div>
+          {mutation.isError && (
+            <div className="rounded-xl border border-destructive/50 bg-destructive/10 p-3 text-sm text-destructive">
+              {(mutation.error as Error).message}
             </div>
+          )}
 
-            <div className="flex items-start gap-2 rounded-xl bg-white/60 p-3 text-[11px] text-muted-foreground">
-              <ShieldCheck className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-600" />
-              <span>Paiement on-chain en TON. Commande envoyée auto au fournisseur dès détection (≈ 30 sec).</span>
-            </div>
-
-            {mutation.isError && (
-              <div className="rounded-xl border border-destructive/50 bg-destructive/10 p-3 text-sm text-destructive">
-                {(mutation.error as Error).message}
-              </div>
-            )}
-
+          {/* Sticky CTA */}
+          <div className="sticky bottom-3 z-20">
             <button
               type="submit"
               disabled={!valid || mutation.isPending}
-              className="flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-br from-primary to-sky-500 px-4 py-3.5 text-sm font-semibold text-primary-foreground shadow-lg shadow-primary/30 transition active:scale-[0.98] disabled:opacity-50"
+              className="flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-br from-primary to-sky-500 px-4 py-4 text-base font-bold text-primary-foreground shadow-xl shadow-primary/30 transition active:scale-[0.98] disabled:opacity-50"
             >
-              {mutation.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
-              Commander
+              {mutation.isPending && <Loader2 className="h-5 w-5 animate-spin" />}
+              {canPayFromBalance ? "Commander (payer avec mon solde)" : "Commander"}
+              <Icon className="h-4 w-4 opacity-80" />
             </button>
+            {signedIn && !canPayFromBalance && priceTon > 0 && (
+              <p className="mt-1.5 text-center text-[11px] text-muted-foreground">
+                Solde insuffisant — vous serez redirigé vers le paiement TON direct.
+              </p>
+            )}
           </div>
         </form>
       ) : (
@@ -303,31 +288,28 @@ function Home() {
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div>
-      <label className="mb-1.5 block text-xs font-semibold text-foreground/80">{label}</label>
+      <label className="mb-1.5 block text-sm font-bold text-foreground">{label}</label>
       {children}
     </div>
   );
 }
 
 function Select({
-  value,
-  onChange,
-  options,
+  value, onChange, options, accent,
 }: {
-  value: string;
-  onChange: (v: string) => void;
-  options: { value: string; label: string }[];
+  value: string; onChange: (v: string) => void;
+  options: { value: string; label: string }[]; accent?: boolean;
 }) {
   return (
     <div className="relative">
       <select
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="w-full appearance-none rounded-xl border border-white/70 bg-white/80 px-3 py-2.5 pr-9 text-sm outline-none ring-primary focus:ring-2"
+        className={`w-full appearance-none rounded-xl border bg-white/90 px-3 py-3 pr-9 text-sm outline-none focus:ring-2 focus:ring-primary ${
+          accent ? "border-primary/60" : "border-white/70"
+        }`}
       >
-        {options.map((o) => (
-          <option key={o.value} value={o.value}>{o.label}</option>
-        ))}
+        {options.map((o) => (<option key={o.value} value={o.value}>{o.label}</option>))}
       </select>
       <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
     </div>
