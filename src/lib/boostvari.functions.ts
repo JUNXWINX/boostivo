@@ -255,6 +255,7 @@ export const adminMarkPaid = createServerFn({ method: "POST" })
 
 function guessPlatform(text: string): string {
   const t = text.toLowerCase();
+  if (t.includes("whatsapp")) return "WhatsApp";
   if (t.includes("instagram") || t.includes("insta")) return "Instagram";
   if (t.includes("tiktok")) return "TikTok";
   if (t.includes("youtube")) return "YouTube";
