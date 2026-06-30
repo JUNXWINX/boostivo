@@ -1,0 +1,1 @@
+UPDATE public.services SET platform='WhatsApp' WHERE active=true AND (name ILIKE '%whatsapp%' OR category ILIKE '%whatsapp%');
