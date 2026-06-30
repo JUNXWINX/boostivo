@@ -14,16 +14,218 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      orders: {
+        Row: {
+          amount_ton: number
+          completed_at: string | null
+          created_at: string
+          id: string
+          link: string
+          memo: string
+          paid_at: string | null
+          provider_order_id: string | null
+          provider_response: Json | null
+          public_code: string
+          quantity: number
+          sent_at: string | null
+          service_id: string
+          status: Database["public"]["Enums"]["order_status"]
+          tx_amount_ton: number | null
+          tx_hash: string | null
+          user_id: string | null
+        }
+        Insert: {
+          amount_ton: number
+          completed_at?: string | null
+          created_at?: string
+          id?: string
+          link: string
+          memo: string
+          paid_at?: string | null
+          provider_order_id?: string | null
+          provider_response?: Json | null
+          public_code: string
+          quantity: number
+          sent_at?: string | null
+          service_id: string
+          status?: Database["public"]["Enums"]["order_status"]
+          tx_amount_ton?: number | null
+          tx_hash?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          amount_ton?: number
+          completed_at?: string | null
+          created_at?: string
+          id?: string
+          link?: string
+          memo?: string
+          paid_at?: string | null
+          provider_order_id?: string | null
+          provider_response?: Json | null
+          public_code?: string
+          quantity?: number
+          sent_at?: string | null
+          service_id?: string
+          status?: Database["public"]["Enums"]["order_status"]
+          tx_amount_ton?: number | null
+          tx_hash?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "orders_service_id_fkey"
+            columns: ["service_id"]
+            isOneToOne: false
+            referencedRelation: "services"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      services: {
+        Row: {
+          active: boolean
+          category: string | null
+          id: string
+          max_qty: number
+          min_qty: number
+          name: string
+          platform: string | null
+          provider_id: string
+          rate_per_1k: number
+          rate_per_1k_ton: number
+          type: string | null
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          category?: string | null
+          id?: string
+          max_qty?: number
+          min_qty?: number
+          name: string
+          platform?: string | null
+          provider_id: string
+          rate_per_1k?: number
+          rate_per_1k_ton?: number
+          type?: string | null
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          category?: string | null
+          id?: string
+          max_qty?: number
+          min_qty?: number
+          name?: string
+          platform?: string | null
+          provider_id?: string
+          rate_per_1k?: number
+          rate_per_1k_ton?: number
+          type?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      settings: {
+        Row: {
+          key: string
+          updated_at: string
+          value: string
+        }
+        Insert: {
+          key: string
+          updated_at?: string
+          value: string
+        }
+        Update: {
+          key?: string
+          updated_at?: string
+          value?: string
+        }
+        Relationships: []
+      }
+      ton_txs: {
+        Row: {
+          amount_ton: number
+          from_addr: string | null
+          hash: string
+          lt: string | null
+          matched_order_id: string | null
+          memo: string | null
+          seen_at: string
+        }
+        Insert: {
+          amount_ton: number
+          from_addr?: string | null
+          hash: string
+          lt?: string | null
+          matched_order_id?: string | null
+          memo?: string | null
+          seen_at?: string
+        }
+        Update: {
+          amount_ton?: number
+          from_addr?: string | null
+          hash?: string
+          lt?: string | null
+          matched_order_id?: string | null
+          memo?: string | null
+          seen_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ton_txs_matched_order_id_fkey"
+            columns: ["matched_order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_roles: {
+        Row: {
+          created_at: string
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
     }
     Enums: {
-      [_ in never]: never
+      app_role: "admin" | "user"
+      order_status:
+        | "pending"
+        | "paid"
+        | "sent"
+        | "completed"
+        | "failed"
+        | "cancelled"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +352,16 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      app_role: ["admin", "user"],
+      order_status: [
+        "pending",
+        "paid",
+        "sent",
+        "completed",
+        "failed",
+        "cancelled",
+      ],
+    },
   },
 } as const
