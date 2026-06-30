@@ -1,86 +1,95 @@
+# Plan : UI ExoBooster + Système de solde utilisateur
 
-# Boostvari — SMM Panel automatique
+## Partie 1 — Refonte de la page commande (style ExoBooster)
 
-## Décision d'architecture
+Reproduire exactement la mise en page de la capture :
 
-Votre code PHP/MySQL existant ne peut pas tourner sur Lovable (stack = React + TanStack Start sur Cloudflare Workers + Postgres). Plutôt qu'adapter SMMBooster (PHP) ou votre projet partiel, on **reconstruit Boostvari à neuf** sur Lovable Cloud. Avantages vs PHP/InfinityFree :
+- Bandeau "CHOISISSEZ VOTRE RÉSEAU SOCIAL CIBLE" + rangée d'icônes plates centrées (TikTok, Instagram, Facebook, Telegram, YouTube, WhatsApp), l'icône active souligné par une bordure colorée.
+- Champs empilés simples (label gras au-dessus, input plein largeur) :
+  - **Service** (liste déroulante)
+  - **Type** (n'apparaît que si plusieurs qualités)
+  - **Lien du compte [Réseau]** (placeholder dynamique)
+  - **Quantité** + texte `(Min: X – Max: Y)` en dessous
+  - **Prix** affiché en pastille verte (montant total dans la devise choisie) + ligne `(X XOF / 1k Followers)` en dessous
+  - **Temps moyen de réalisation** (champ readonly)
+  - **Remarque** : zone d'aide avec règles 1/2/3 spécifiques au service
+- Bouton **Commander** sticky en bas.
 
-- Vérification TON **automatique on-chain** (toncenter) → plus de "j'ai payé" manuel
-- Envoi commande ExoBooster **100% automatique** dès paiement détecté
-- Mobile-first natif, pas de lenteur InfinityFree
-- HTTPS, base managée, secrets sécurisés (pas de clé API en clair dans le code PHP)
+### Correction du calcul de prix
 
-Hébergement : gratuit sur Lovable (sous-domaine `.lovable.app`). InfinityFree n'est plus nécessaire.
+Vérifier la formule de bout en bout pour qu'à chaque changement de quantité, **prix XOF = (rate_per_1k_ton × xof_per_ton × quantité) / 1000** arrondi à l'unité, et **prix TON = (rate_per_1k_ton × quantité) / 1000** arrondi à 4 décimales. Recalculer immédiatement à chaque saisie sans décalage d'un tick.
 
-## Fonctionnalités
+## Partie 2 — Comptes utilisateurs
 
-**Client (mobile-first)**
-- Catalogue services (synchronisé depuis ExoBooster `action=services`)
-- Recherche + filtre par plateforme (Instagram, TikTok, YouTube…)
-- Formulaire commande : lien + quantité → prix calculé en TON en direct
-- Page paiement : adresse TON + **mémo unique** + QR code + bouton copier
-- Suivi commande par ID (status temps réel : pending → paid → sent → completed)
+- Page `/auth` avec onglets **Connexion / Inscription** :
+  - Inscription : `username`, `email`, `password` + bouton œil pour afficher/masquer
+  - Vérification temps réel que l'username n'est pas déjà pris (debounced)
+  - Email de vérification envoyé via Lovable Auth (template par défaut)
+- Page `/reset-password` pour mot de passe oublié + formulaire nouveau mdp
+- Table `profiles` (user_id, username unique, balance_ton, preferred_currency 'XOF'|'USD', created_at)
 
-**Admin**
-- Login (rôle admin via table `user_roles`)
-- Dashboard : commandes, revenus, taux conversion
-- Liste commandes filtrables, détails, retry manuel ExoBooster
-- Gestion services : import depuis ExoBooster, markup (%), activer/désactiver
+## Partie 3 — Solde et dépôts TON
 
-**Automatisation TON**
-- Cron toutes les 30s : scan transactions entrantes sur `UQCFRAi…K0MS` via toncenter
-- Match `memo` ↔ commande → status `paid` → push auto vers ExoBooster → status `sent`
-- Stockage `tx_hash` pour audit
+### Affichage solde (en haut de chaque page)
 
-## Stack technique
+Pastille verte type ExoBooster : `[+] 12 500 XOF` (cliquable → page Dépôt). Toggle FR/devise dans le header (XOF ↔ USD ↔ TON).
 
-- TanStack Start (React 19 + SSR)
-- Lovable Cloud (Postgres + Auth + Secrets)
-- Tailwind v4, thème **dark + bleu moderne**
-- Server functions pour : prix, créer commande, webhook TON-checker, push ExoBooster
-- Route publique `/api/public/ton-check` déclenchée par pg_cron (30s)
+### Page `/wallet` (Dépôt)
 
-## Schéma base de données
+1. Affiche l'adresse TON du wallet maître (copiable + QR code).
+2. **Memo unique par utilisateur** (généré une fois et stocké dans `profiles.deposit_memo`).
+3. Avertissement **EN ROUGE GRAS** : « ⚠️ IMPORTANT : Vous DEVEZ coller le memo `XXXX` avant de confirmer l'envoi. Sans ce memo, votre dépôt sera PERDU définitivement et irrécupérable. »
+4. Formulaire « J'ai envoyé X TON » qui force le scan immédiat.
+5. Historique des dépôts (en attente / confirmés).
+
+### Vérification automatique
+
+Le cron `/api/public/ton-check` existant est étendu : pour chaque tx entrante avec un memo qui matche `profiles.deposit_memo`, créditer `balance_ton` et insérer une ligne dans `deposits`. Déduplication via `ton_txs.hash`.
+
+### Paiement des commandes depuis le solde
+
+Au lieu de payer chaque commande on-chain, l'utilisateur connecté paie en débitant son solde TON. La commande passe direct en `paid` → `pushToProvider` (latence nulle). Les utilisateurs non connectés gardent le flow on-chain actuel.
+
+### Préférence d'affichage
+
+Setting `preferred_currency` dans `profiles` : choix entre `XOF` et `USD`. Tous les prix et le solde s'affichent dans cette devise + équivalent TON en secondaire partout. Taux USD/TON ajouté dans `settings` (ex. `usd_per_ton = 5.5`).
+
+## Schéma DB
 
 ```text
-services      (id, provider_id, name, category, platform, rate_per_1k_ton,
-               min_qty, max_qty, active, updated_at)
-orders        (id, public_code, service_id, link, quantity, amount_ton,
-               memo, status, provider_order_id, tx_hash, user_id?,
-               created_at, paid_at, sent_at)
-ton_txs       (hash PK, memo, amount_ton, from_addr, lt, seen_at)  -- dédup
-user_roles    (user_id, role)                                       -- admin gate
-settings      (key, value)                                          -- markup %, TON addr
+profiles
+  - user_id (uuid, pk, ref auth.users)
+  - username (text unique)
+  - balance_ton (numeric default 0)
+  - deposit_memo (text unique)
+  - preferred_currency (text default 'XOF')
+
+deposits
+  - user_id, amount_ton, tx_hash (unique), memo, status, created_at
+
+settings (ajouts)
+  - usd_per_ton
 ```
 
-RLS : `orders` lisible par tous via `public_code` (suivi anonyme), écriture admin uniquement ; `services` lecture publique ; `settings`/`ton_txs` admin only.
+RLS : chaque utilisateur lit/écrit uniquement ses lignes ; le crédit du solde se fait via fonction SECURITY DEFINER appelée par le cron côté serveur.
 
-## Secrets nécessaires
+## Hors scope (pour rester focus)
 
-- `EXOBOOSTER_API_KEY` = `390213078841f7317f498c607204c6d0` (fourni)
-- `EXOBOOSTER_API_URL` = `https://exosupplier.com/api/v2` (en clair OK, mais on le met aussi en secret)
-- `TON_RECEIVE_ADDRESS` = `UQCFRAiDxDKyRdfql_6EeSwVS6-8kje0qyWIKQsXpExiK0MS`
-- `TONCENTER_API_KEY` (optionnel, gratuit sur toncenter.com — augmente rate limit)
-- `ADMIN_EMAIL` à définir lors du premier login
+- Pas de retrait (TON → utilisateur) dans cette itération
+- Pas de 2FA
 
-## Plan de livraison (un seul build)
+## Détails techniques
 
-1. Activer Lovable Cloud + créer schéma + RLS + rôle admin
-2. Stocker secrets ExoBooster + adresse TON
-3. Server functions :
-   - `syncServices()` (import + markup)
-   - `quote(serviceId, qty)` → prix TON
-   - `createOrder()` → génère mémo unique 8 chars
-   - `tonCheck()` (route publique sécurisée + pg_cron 30s)
-   - `pushToExobooster(orderId)` (auto + retry manuel admin)
-4. UI client : home/catalogue, page service, checkout, page paiement (QR), suivi
-5. UI admin : login, dashboard, commandes, services
-6. Test E2E : créer commande → simuler paiement → vérifier envoi ExoBooster
+- Frontend : refonte de `src/routes/index.tsx` pour matcher 1:1 la capture ExoBooster (champs empilés, pastille verte, remarques).
+- `src/lib/format.ts` : ajouter `formatUsd`, helper `formatPrice(amount, currency)` unique pour éviter les divergences.
+- `src/routes/auth.tsx` : refonte avec onglets, check username via server fn, toggle password.
+- Nouveau `src/routes/_authenticated/wallet.tsx` : adresse + memo + QR + historique.
+- Nouveau `src/components/BalancePill.tsx` + currency switcher dans `AppShell`.
+- Migration : table `profiles`, `deposits`, fonctions `credit_balance`, `debit_balance`, trigger auto-create profile à l'inscription avec memo généré.
+- `processing.server.ts` étendu : si memo match un `profiles.deposit_memo`, créditer le solde au lieu de matcher une commande.
+- `createOrder` server fn : si user connecté avec solde suffisant, débiter + push immédiat ; sinon flow on-chain existant.
+- Email de vérification : utilise le flow Supabase Auth standard (déjà actif).
 
-## Hors scope
+&nbsp;
 
-- App mobile native (le site est mobile-first et installable PWA si demandé plus tard)
-- Multi-crypto (TON uniquement comme demandé)
-- Système de tickets/support (peut être ajouté ensuite)
-
-Confirmez-vous ce plan ? Dites "go" et je construis.
+Il doit y avoir l'historique de commande et l'historique de paiement précisément appelé Portefeuille et le solde doit être afficher dedans,et pour le solde je pense que tu comprends déjà quand il effectuer son dépôt c'est juste un affichage et chaque commande est déduit de ce solde tu comprends nn moi je reçois l'argent et comme j'avais déjà recharger mon compte API de exobooster la où les commandes seront payés mais avec le prix de exobooster genre leur plateforme 

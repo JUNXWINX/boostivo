@@ -19,8 +19,7 @@ export async function pushToProvider(orderId: string): Promise<{ ok: boolean; st
     const res = await addOrder({ service: providerId, link: order.link, quantity: order.quantity });
     if (res.error || !res.order) {
       await supabaseAdmin.from("orders").update({
-        status: "failed",
-        provider_response: res.raw as never,
+        status: "failed", provider_response: res.raw as never,
       }).eq("id", orderId);
       return { ok: false, status: "failed", error: res.error || "Pas d'ID commande renvoyé" };
     }
@@ -41,12 +40,13 @@ export async function pushToProvider(orderId: string): Promise<{ ok: boolean; st
   }
 }
 
-export async function runTonCheck(): Promise<{ scanned: number; matched: number; pushed: number }> {
+export async function runTonCheck(): Promise<{ scanned: number; orderMatches: number; depositCredits: number; pushed: number }> {
   const address = process.env.TON_RECEIVE_ADDRESS;
-  if (!address) return { scanned: 0, matched: 0, pushed: 0 };
+  if (!address) return { scanned: 0, orderMatches: 0, depositCredits: 0, pushed: 0 };
 
   const txs = await fetchIncomingTxs(address, 40);
-  let matched = 0;
+  let orderMatches = 0;
+  let depositCredits = 0;
   let pushed = 0;
 
   for (const tx of txs) {
@@ -55,22 +55,18 @@ export async function runTonCheck(): Promise<{ scanned: number; matched: number;
     const amount = nanoToTon(tx.in_msg?.value ?? "0");
     if (!memo) continue;
 
-    // Dedup
+    // dedup
     const { data: seen } = await supabaseAdmin
-      .from("ton_txs")
-      .select("hash")
-      .eq("hash", hash)
-      .maybeSingle();
+      .from("ton_txs").select("hash").eq("hash", hash).maybeSingle();
     if (seen) continue;
 
-    // Find matching pending order by memo
-    const { data: order } = await supabaseAdmin
-      .from("orders")
-      .select("id, amount_ton, status")
-      .eq("memo", memo)
-      .maybeSingle();
-
     let matchedOrderId: string | null = null;
+
+    // 1) Try to match a pending order
+    const { data: order } = await supabaseAdmin
+      .from("orders").select("id, amount_ton, status, user_id")
+      .eq("memo", memo).maybeSingle();
+
     if (order && order.status === "pending" && amount + 0.001 >= Number(order.amount_ton)) {
       const { error: upd } = await supabaseAdmin.from("orders").update({
         status: "paid",
@@ -80,21 +76,38 @@ export async function runTonCheck(): Promise<{ scanned: number; matched: number;
       }).eq("id", order.id).eq("status", "pending");
       if (!upd) {
         matchedOrderId = order.id;
-        matched++;
+        orderMatches++;
         const res = await pushToProvider(order.id);
         if (res.ok) pushed++;
+      }
+    } else {
+      // 2) Try to match a user deposit memo
+      const { data: profile } = await supabaseAdmin
+        .from("profiles").select("user_id").eq("deposit_memo", memo).maybeSingle();
+      if (profile) {
+        // insert deposit (unique tx_hash protects against double credit)
+        const { error: depErr } = await supabaseAdmin.from("deposits").insert({
+          user_id: profile.user_id,
+          amount_ton: amount,
+          tx_hash: hash,
+          memo,
+          from_addr: tx.in_msg?.source ?? null,
+          status: "confirmed",
+        });
+        if (!depErr) {
+          await supabaseAdmin.rpc("credit_balance", { _user: profile.user_id, _amount: amount });
+          depositCredits++;
+        }
       }
     }
 
     await supabaseAdmin.from("ton_txs").insert({
-      hash,
-      memo,
-      amount_ton: amount,
+      hash, memo, amount_ton: amount,
       from_addr: tx.in_msg?.source ?? null,
       lt: tx.transaction_id.lt,
       matched_order_id: matchedOrderId,
     });
   }
 
-  return { scanned: txs.length, matched, pushed };
+  return { scanned: txs.length, orderMatches, depositCredits, pushed };
 }

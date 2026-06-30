@@ -93,7 +93,7 @@ function AdminPage() {
       )}
       {tonScan.data && (
         <div className="mt-3 rounded-lg border border-blue-500/30 bg-blue-500/10 p-3 text-xs">
-          Scan TON: {tonScan.data.scanned} txs · {tonScan.data.matched} matchées · {tonScan.data.pushed} envoyées
+          Scan TON: {tonScan.data.scanned} txs · {tonScan.data.orderMatches} commandes · {tonScan.data.depositCredits} dépôts · {tonScan.data.pushed} envoyées
         </div>
       )}
 

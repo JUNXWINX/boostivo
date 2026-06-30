@@ -10,17 +10,23 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as TrackRouteImport } from './routes/track'
+import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as IndexRouteImport } from './routes/index'
-import { Route as ServiceIdRouteImport } from './routes/service.$id'
 import { Route as OrderCodeRouteImport } from './routes/order.$code'
+import { Route as AuthenticatedWalletRouteImport } from './routes/_authenticated/wallet'
 import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated/admin'
 import { Route as ApiPublicTonCheckRouteImport } from './routes/api/public/ton-check'
 
 const TrackRoute = TrackRouteImport.update({
   id: '/track',
   path: '/track',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ResetPasswordRoute = ResetPasswordRouteImport.update({
+  id: '/reset-password',
+  path: '/reset-password',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AuthRoute = AuthRouteImport.update({
@@ -37,15 +43,15 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ServiceIdRoute = ServiceIdRouteImport.update({
-  id: '/service/$id',
-  path: '/service/$id',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const OrderCodeRoute = OrderCodeRouteImport.update({
   id: '/order/$code',
   path: '/order/$code',
   getParentRoute: () => rootRouteImport,
+} as any)
+const AuthenticatedWalletRoute = AuthenticatedWalletRouteImport.update({
+  id: '/wallet',
+  path: '/wallet',
+  getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 const AuthenticatedAdminRoute = AuthenticatedAdminRouteImport.update({
   id: '/admin',
@@ -61,19 +67,21 @@ const ApiPublicTonCheckRoute = ApiPublicTonCheckRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
+  '/reset-password': typeof ResetPasswordRoute
   '/track': typeof TrackRoute
   '/admin': typeof AuthenticatedAdminRoute
+  '/wallet': typeof AuthenticatedWalletRoute
   '/order/$code': typeof OrderCodeRoute
-  '/service/$id': typeof ServiceIdRoute
   '/api/public/ton-check': typeof ApiPublicTonCheckRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
+  '/reset-password': typeof ResetPasswordRoute
   '/track': typeof TrackRoute
   '/admin': typeof AuthenticatedAdminRoute
+  '/wallet': typeof AuthenticatedWalletRoute
   '/order/$code': typeof OrderCodeRoute
-  '/service/$id': typeof ServiceIdRoute
   '/api/public/ton-check': typeof ApiPublicTonCheckRoute
 }
 export interface FileRoutesById {
@@ -81,10 +89,11 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
   '/auth': typeof AuthRoute
+  '/reset-password': typeof ResetPasswordRoute
   '/track': typeof TrackRoute
   '/_authenticated/admin': typeof AuthenticatedAdminRoute
+  '/_authenticated/wallet': typeof AuthenticatedWalletRoute
   '/order/$code': typeof OrderCodeRoute
-  '/service/$id': typeof ServiceIdRoute
   '/api/public/ton-check': typeof ApiPublicTonCheckRoute
 }
 export interface FileRouteTypes {
@@ -92,29 +101,32 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/auth'
+    | '/reset-password'
     | '/track'
     | '/admin'
+    | '/wallet'
     | '/order/$code'
-    | '/service/$id'
     | '/api/public/ton-check'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
     | '/auth'
+    | '/reset-password'
     | '/track'
     | '/admin'
+    | '/wallet'
     | '/order/$code'
-    | '/service/$id'
     | '/api/public/ton-check'
   id:
     | '__root__'
     | '/'
     | '/_authenticated'
     | '/auth'
+    | '/reset-password'
     | '/track'
     | '/_authenticated/admin'
+    | '/_authenticated/wallet'
     | '/order/$code'
-    | '/service/$id'
     | '/api/public/ton-check'
   fileRoutesById: FileRoutesById
 }
@@ -122,9 +134,9 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
   AuthRoute: typeof AuthRoute
+  ResetPasswordRoute: typeof ResetPasswordRoute
   TrackRoute: typeof TrackRoute
   OrderCodeRoute: typeof OrderCodeRoute
-  ServiceIdRoute: typeof ServiceIdRoute
   ApiPublicTonCheckRoute: typeof ApiPublicTonCheckRoute
 }
 
@@ -135,6 +147,13 @@ declare module '@tanstack/react-router' {
       path: '/track'
       fullPath: '/track'
       preLoaderRoute: typeof TrackRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/reset-password': {
+      id: '/reset-password'
+      path: '/reset-password'
+      fullPath: '/reset-password'
+      preLoaderRoute: typeof ResetPasswordRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/auth': {
@@ -158,19 +177,19 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/service/$id': {
-      id: '/service/$id'
-      path: '/service/$id'
-      fullPath: '/service/$id'
-      preLoaderRoute: typeof ServiceIdRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/order/$code': {
       id: '/order/$code'
       path: '/order/$code'
       fullPath: '/order/$code'
       preLoaderRoute: typeof OrderCodeRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/_authenticated/wallet': {
+      id: '/_authenticated/wallet'
+      path: '/wallet'
+      fullPath: '/wallet'
+      preLoaderRoute: typeof AuthenticatedWalletRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/admin': {
       id: '/_authenticated/admin'
@@ -191,10 +210,12 @@ declare module '@tanstack/react-router' {
 
 interface AuthenticatedRouteRouteChildren {
   AuthenticatedAdminRoute: typeof AuthenticatedAdminRoute
+  AuthenticatedWalletRoute: typeof AuthenticatedWalletRoute
 }
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedAdminRoute: AuthenticatedAdminRoute,
+  AuthenticatedWalletRoute: AuthenticatedWalletRoute,
 }
 
 const AuthenticatedRouteRouteWithChildren =
@@ -204,21 +225,11 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
   AuthRoute: AuthRoute,
+  ResetPasswordRoute: ResetPasswordRoute,
   TrackRoute: TrackRoute,
   OrderCodeRoute: OrderCodeRoute,
-  ServiceIdRoute: ServiceIdRoute,
   ApiPublicTonCheckRoute: ApiPublicTonCheckRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}
