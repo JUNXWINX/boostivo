@@ -146,7 +146,7 @@ function Home() {
         <p className="mb-2 px-1 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
           Choisissez votre réseau
         </p>
-        <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        <div className="flex flex-wrap justify-center gap-2 pb-1">
           {platforms.map((p) => {
             const pi = getPlatform(p);
             const PIcon = pi.icon;
