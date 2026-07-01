@@ -16,9 +16,13 @@ const ratesQuery = queryOptions({ queryKey: ["rates"], queryFn: () => getRates()
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "Boostvari — SMM Panel TON" },
-      { name: "description", content: "Achetez followers, likes, vues. Paiement TON, livraison auto." },
+      { title: "Boostvari — SMM Panel avec paiements TON" },
+      { name: "description", content: "Boostvari : SMM panel automatique. Achetez followers, likes et vues sur Instagram, TikTok, Telegram, YouTube. Paiement TON, livraison en quelques minutes." },
+      { property: "og:title", content: "Boostvari — SMM Panel avec paiements TON" },
+      { property: "og:description", content: "Followers, likes, vues. Paiement TON, livraison automatique." },
+      { property: "og:url", content: "https://boostvari.lovable.app/" },
     ],
+    links: [{ rel: "canonical", href: "https://boostvari.lovable.app/" }],
   }),
   loader: ({ context }) => Promise.all([
     context.queryClient.ensureQueryData(servicesQuery),
