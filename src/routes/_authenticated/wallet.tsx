@@ -11,7 +11,17 @@ import { formatPrice, formatTon } from "@/lib/format";
 import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/_authenticated/wallet")({
-  head: () => ({ meta: [{ title: "Portefeuille — Boostvari" }] }),
+  head: () => ({
+    meta: [
+      { title: "Portefeuille TON — Boostvari" },
+      { name: "description", content: "Gérez votre solde TON Boostvari : rechargez votre portefeuille avec un memo unique et suivez l'historique de vos dépôts." },
+      { property: "og:title", content: "Portefeuille TON — Boostvari" },
+      { property: "og:description", content: "Rechargez votre solde TON et suivez l'historique de vos dépôts." },
+      { property: "og:url", content: "https://boostvari.lovable.app/wallet" },
+      { name: "robots", content: "noindex" },
+    ],
+    links: [{ rel: "canonical", href: "https://boostvari.lovable.app/wallet" }],
+  }),
   component: WalletPage,
 });
 
