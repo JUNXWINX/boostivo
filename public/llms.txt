@@ -7,4 +7,3 @@ Boostvari est une plateforme marketplace de services de marketing pour réseaux 
 ## Pages
 
 - [Accueil](/): Choisir un réseau social, un service et passer commande.
-</content>
