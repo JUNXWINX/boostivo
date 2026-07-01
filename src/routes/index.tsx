@@ -141,6 +141,7 @@ function Home() {
 
   return (
     <AppShell>
+      <h1 className="sr-only">Boostvari : SMM Panel avec paiements TON</h1>
       {/* Network picker */}
       <div className="mb-4 rounded-3xl glass-strong p-4">
         <p className="mb-3 text-center text-[12px] font-bold uppercase tracking-wider text-foreground/80">
