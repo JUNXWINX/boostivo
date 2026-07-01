@@ -94,9 +94,10 @@ function AuthPage() {
         <form onSubmit={submit} className="space-y-3">
           {mode === "signup" && (
             <div>
-              <label className="mb-1 block text-xs font-semibold">Nom d'utilisateur</label>
+              <label htmlFor="auth-username" className="mb-1 block text-xs font-semibold">Nom d'utilisateur</label>
               <div className="relative">
                 <input
+                  id="auth-username"
                   required minLength={3} maxLength={24}
                   value={username}
                   onChange={(e) => setUsername(e.target.value.toLowerCase())}
@@ -116,8 +117,9 @@ function AuthPage() {
           )}
 
           <div>
-            <label className="mb-1 block text-xs font-semibold">Email</label>
+            <label htmlFor="auth-email" className="mb-1 block text-xs font-semibold">Email</label>
             <input
+              id="auth-email"
               type="email" required value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="email@exemple.com"
@@ -127,9 +129,10 @@ function AuthPage() {
 
           {mode !== "forgot" && (
             <div>
-              <label className="mb-1 block text-xs font-semibold">Mot de passe</label>
+              <label htmlFor="auth-password" className="mb-1 block text-xs font-semibold">Mot de passe</label>
               <div className="relative">
                 <input
+                  id="auth-password"
                   type={showPwd ? "text" : "password"}
                   required minLength={6}
                   value={password}
