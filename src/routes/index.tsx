@@ -292,10 +292,10 @@ function Home() {
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div>
-      <label className="mb-1.5 block text-sm font-bold text-foreground">{label}</label>
+    <label className="block">
+      <span className="mb-1.5 block text-sm font-bold text-foreground">{label}</span>
       {children}
-    </div>
+    </label>
   );
 }
 
