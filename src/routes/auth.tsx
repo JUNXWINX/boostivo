@@ -86,6 +86,9 @@ function AuthPage() {
   return (
     <AppShell>
       <div className="mx-auto max-w-sm rounded-3xl glass-strong p-6">
+        <h1 className="sr-only">
+          {mode === "login" ? "Connexion à Boostvari" : mode === "signup" ? "Créer un compte Boostvari" : "Réinitialiser le mot de passe Boostvari"}
+        </h1>
         <div className="mb-4 flex rounded-xl bg-white/60 p-1 text-sm font-medium">
           <Tab active={mode === "login"} onClick={() => setMode("login")}>Connexion</Tab>
           <Tab active={mode === "signup"} onClick={() => setMode("signup")}>Inscription</Tab>

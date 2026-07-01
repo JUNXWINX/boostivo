@@ -15,7 +15,17 @@ import { formatTon } from "@/lib/format";
 import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/_authenticated/admin")({
-  head: () => ({ meta: [{ title: "Admin — Boostvari" }] }),
+  head: () => ({
+    meta: [
+      { title: "Panneau d'administration — Boostvari" },
+      { name: "description", content: "Panneau d'administration Boostvari : gérez les commandes, synchronisez les services et suivez les paiements TON." },
+      { property: "og:title", content: "Panneau d'administration — Boostvari" },
+      { property: "og:description", content: "Gérez les commandes et les services Boostvari." },
+      { property: "og:url", content: "https://boostvari.lovable.app/admin" },
+      { name: "robots", content: "noindex" },
+    ],
+    links: [{ rel: "canonical", href: "https://boostvari.lovable.app/admin" }],
+  }),
   component: AdminPage,
 });
 
