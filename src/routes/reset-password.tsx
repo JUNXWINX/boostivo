@@ -6,7 +6,16 @@ import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/reset-password")({
   ssr: false,
-  head: () => ({ meta: [{ title: "Nouveau mot de passe — Boostvari" }] }),
+  head: () => ({
+    meta: [
+      { title: "Nouveau mot de passe — Boostvari" },
+      { name: "description", content: "Définissez un nouveau mot de passe pour votre compte Boostvari." },
+      { property: "og:title", content: "Nouveau mot de passe — Boostvari" },
+      { property: "og:url", content: "https://boostvari.lovable.app/reset-password" },
+      { name: "robots", content: "noindex" },
+    ],
+    links: [{ rel: "canonical", href: "https://boostvari.lovable.app/reset-password" }],
+  }),
   component: ResetPage,
 });
 
