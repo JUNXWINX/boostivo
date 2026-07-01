@@ -1,0 +1,10 @@
+User-agent: *
+Allow: /
+Disallow: /wallet
+Disallow: /orders
+Disallow: /admin
+Disallow: /auth
+Disallow: /reset-password
+Disallow: /order/
+
+Sitemap: https://boostvari.lovable.app/sitemap.xml

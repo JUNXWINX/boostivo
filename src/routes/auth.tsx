@@ -7,7 +7,16 @@ import { supabase } from "@/integrations/supabase/client";
 import { checkUsername } from "@/lib/boostvari.functions";
 
 export const Route = createFileRoute("/auth")({
-  head: () => ({ meta: [{ title: "Connexion — Boostvari" }] }),
+  head: () => ({
+    meta: [
+      { title: "Connexion & Inscription — Boostvari" },
+      { name: "description", content: "Connectez-vous ou créez votre compte Boostvari pour commander des services SMM et gérer votre portefeuille TON." },
+      { property: "og:title", content: "Connexion — Boostvari" },
+      { property: "og:description", content: "Accédez à votre compte Boostvari et gérez votre portefeuille TON." },
+      { property: "og:url", content: "https://boostvari.lovable.app/auth" },
+    ],
+    links: [{ rel: "canonical", href: "https://boostvari.lovable.app/auth" }],
+  }),
   component: AuthPage,
 });
 
@@ -85,9 +94,10 @@ function AuthPage() {
         <form onSubmit={submit} className="space-y-3">
           {mode === "signup" && (
             <div>
-              <label className="mb-1 block text-xs font-semibold">Nom d'utilisateur</label>
+              <label htmlFor="auth-username" className="mb-1 block text-xs font-semibold">Nom d'utilisateur</label>
               <div className="relative">
                 <input
+                  id="auth-username"
                   required minLength={3} maxLength={24}
                   value={username}
                   onChange={(e) => setUsername(e.target.value.toLowerCase())}
@@ -107,8 +117,9 @@ function AuthPage() {
           )}
 
           <div>
-            <label className="mb-1 block text-xs font-semibold">Email</label>
+            <label htmlFor="auth-email" className="mb-1 block text-xs font-semibold">Email</label>
             <input
+              id="auth-email"
               type="email" required value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="email@exemple.com"
@@ -118,9 +129,10 @@ function AuthPage() {
 
           {mode !== "forgot" && (
             <div>
-              <label className="mb-1 block text-xs font-semibold">Mot de passe</label>
+              <label htmlFor="auth-password" className="mb-1 block text-xs font-semibold">Mot de passe</label>
               <div className="relative">
                 <input
+                  id="auth-password"
                   type={showPwd ? "text" : "password"}
                   required minLength={6}
                   value={password}

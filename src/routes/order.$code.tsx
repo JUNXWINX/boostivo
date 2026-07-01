@@ -16,6 +16,17 @@ const orderQuery = (code: string) =>
   });
 
 export const Route = createFileRoute("/order/$code")({
+  head: ({ params }) => ({
+    meta: [
+      { title: `Commande #${params.code} — Boostvari` },
+      { name: "description", content: `Suivi de la commande #${params.code} : statut du paiement TON et livraison automatique.` },
+      { property: "og:title", content: `Commande #${params.code} — Boostvari` },
+      { property: "og:description", content: "Suivi de commande et paiement TON en temps réel." },
+      { property: "og:url", content: `https://boostvari.lovable.app/order/${params.code}` },
+      { name: "robots", content: "noindex" },
+    ],
+    links: [{ rel: "canonical", href: `https://boostvari.lovable.app/order/${params.code}` }],
+  }),
   loader: ({ context, params }) => context.queryClient.ensureQueryData(orderQuery(params.code)),
   component: OrderPage,
   errorComponent: ({ error }) => (

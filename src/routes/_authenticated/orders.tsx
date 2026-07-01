@@ -10,7 +10,17 @@ import { getPlatform } from "@/lib/platform";
 import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/_authenticated/orders")({
-  head: () => ({ meta: [{ title: "Mes commandes — Boostvari" }] }),
+  head: () => ({
+    meta: [
+      { title: "Mes commandes — Boostvari" },
+      { name: "description", content: "Suivez en temps réel vos commandes SMM Boostvari : statut du paiement TON et progression de la livraison." },
+      { property: "og:title", content: "Mes commandes — Boostvari" },
+      { property: "og:description", content: "Suivi en temps réel de vos commandes SMM." },
+      { property: "og:url", content: "https://boostvari.lovable.app/orders" },
+      { name: "robots", content: "noindex" },
+    ],
+    links: [{ rel: "canonical", href: "https://boostvari.lovable.app/orders" }],
+  }),
   component: OrdersPage,
 });
 
