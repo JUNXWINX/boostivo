@@ -80,6 +80,7 @@ function WalletPage() {
 
   return (
     <AppShell>
+      <h1 className="sr-only">Votre portefeuille TON Boostvari</h1>
       <div className="space-y-4">
         {/* Balance card */}
         <div className="rounded-3xl glass-strong p-5">
