@@ -7,7 +7,16 @@ import { supabase } from "@/integrations/supabase/client";
 import { checkUsername } from "@/lib/boostvari.functions";
 
 export const Route = createFileRoute("/auth")({
-  head: () => ({ meta: [{ title: "Connexion — Boostvari" }] }),
+  head: () => ({
+    meta: [
+      { title: "Connexion & Inscription — Boostvari" },
+      { name: "description", content: "Connectez-vous ou créez votre compte Boostvari pour commander des services SMM et gérer votre portefeuille TON." },
+      { property: "og:title", content: "Connexion — Boostvari" },
+      { property: "og:description", content: "Accédez à votre compte Boostvari et gérez votre portefeuille TON." },
+      { property: "og:url", content: "https://boostvari.lovable.app/auth" },
+    ],
+    links: [{ rel: "canonical", href: "https://boostvari.lovable.app/auth" }],
+  }),
   component: AuthPage,
 });
 
