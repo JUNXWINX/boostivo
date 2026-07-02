@@ -189,7 +189,7 @@ function Home() {
                 onChange={setVariantId}
                 options={variantOpts.map((v) => ({
                   value: v.svc.id,
-                  label: `${v.variant} — ${formatPrice(Number(v.svc.rate_per_1k_ton), currency, { xof: rates.xof_per_ton, usd: rates.usd_per_ton })} / 1k`,
+                  label: `${v.variant} — ${formatPrice(Number(v.svc.rate_per_1k_ton), currency, { xof: rates.xof_per_ton, usd: rates.usd_per_ton, usdt: rates.usdt_per_ton })} / 1k`,
                 }))}
               />
             </Field>
@@ -239,11 +239,11 @@ function Home() {
           <div className="flex flex-wrap items-center gap-3 rounded-2xl glass p-4">
             <span className="text-sm font-bold">Prix :</span>
             <span className="rounded-lg bg-emerald-500 px-4 py-2 text-lg font-bold text-white shadow">
-              {formatPrice(priceTon, currency, { xof: rates.xof_per_ton, usd: rates.usd_per_ton })}
+              {formatPrice(priceTon, currency, { xof: rates.xof_per_ton, usd: rates.usd_per_ton, usdt: rates.usdt_per_ton })}
             </span>
             <span className="text-xs text-muted-foreground">≈ {formatTon(priceTon)}</span>
             <div className="basis-full text-xs text-muted-foreground">
-              ({formatPrice(rateRow, currency, { xof: rates.xof_per_ton, usd: rates.usd_per_ton })} / 1k {decode(serviceGroup).toLowerCase()})
+              ({formatPrice(rateRow, currency, { xof: rates.xof_per_ton, usd: rates.usd_per_ton, usdt: rates.usdt_per_ton })} / 1k {decode(serviceGroup).toLowerCase()})
             </div>
           </div>
 
