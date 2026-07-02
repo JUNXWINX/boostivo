@@ -1,7 +1,7 @@
 // Server-only processing: TON scanner + push to ExoBooster
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { addOrder } from "./exobooster.server";
-import { decodeMemo, fetchIncomingTxs, nanoToTon } from "./ton.server";
+import { decodeMemo, fetchIncomingTxs, fetchIncomingUsdtJettons, nanoToTon } from "./ton.server";
 
 export async function pushToProvider(orderId: string): Promise<{ ok: boolean; status: string; error?: string }> {
   const { data: order, error } = await supabaseAdmin
