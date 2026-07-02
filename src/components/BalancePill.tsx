@@ -42,7 +42,7 @@ export function BalancePill() {
       <span className="grid h-6 w-6 place-items-center rounded-full bg-white/20">
         <Plus className="h-3.5 w-3.5" />
       </span>
-      <span>{formatPrice(balance, currency)}</span>
+      <span>{formatPrice(balance, currency, rates)}</span>
       <Wallet className="h-3.5 w-3.5 opacity-80" />
     </Link>
   );
