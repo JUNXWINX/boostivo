@@ -9,10 +9,10 @@ import { checkUsername } from "@/lib/boostvari.functions";
 export const Route = createFileRoute("/auth")({
   head: () => ({
     meta: [
-      { title: "Connexion & Inscription — Boostvari" },
-      { name: "description", content: "Connectez-vous ou créez votre compte Boostvari pour commander des services SMM et gérer votre portefeuille TON." },
-      { property: "og:title", content: "Connexion — Boostvari" },
-      { property: "og:description", content: "Accédez à votre compte Boostvari et gérez votre portefeuille TON." },
+      { title: "Connexion & Inscription — Boostivo" },
+      { name: "description", content: "Connectez-vous ou créez votre compte Boostivo pour commander des services SMM et gérer votre portefeuille TON." },
+      { property: "og:title", content: "Connexion — Boostivo" },
+      { property: "og:description", content: "Accédez à votre compte Boostivo et gérez votre portefeuille TON." },
       { property: "og:url", content: "https://boostvari.lovable.app/auth" },
     ],
     links: [{ rel: "canonical", href: "https://boostvari.lovable.app/auth" }],
@@ -87,7 +87,7 @@ function AuthPage() {
     <AppShell>
       <div className="mx-auto max-w-sm rounded-3xl glass-strong p-6">
         <h1 className="sr-only">
-          {mode === "login" ? "Connexion à Boostvari" : mode === "signup" ? "Créer un compte Boostvari" : "Réinitialiser le mot de passe Boostvari"}
+          {mode === "login" ? "Connexion à Boostivo" : mode === "signup" ? "Créer un compte Boostivo" : "Réinitialiser le mot de passe Boostivo"}
         </h1>
         <div className="mb-4 flex rounded-xl bg-white/60 p-1 text-sm font-medium">
           <Tab active={mode === "login"} onClick={() => setMode("login")}>Connexion</Tab>

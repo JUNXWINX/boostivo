@@ -10,6 +10,12 @@ type ProviderService = {
   rate: string | number;
   min: string | number;
   max: string | number;
+  description?: string;
+  average_time?: string;
+  avg_time?: string;
+  refill?: boolean;
+  cancel?: boolean;
+  dripfeed?: boolean;
 };
 
 async function call(params: Record<string, string>): Promise<unknown> {

@@ -1,7 +1,7 @@
 // Server-only processing: TON scanner + push to ExoBooster
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { addOrder } from "./exobooster.server";
-import { decodeMemo, fetchIncomingTxs, nanoToTon } from "./ton.server";
+import { decodeMemo, fetchIncomingTxs, fetchIncomingUsdtJettons, nanoToTon } from "./ton.server";
 
 export async function pushToProvider(orderId: string): Promise<{ ok: boolean; status: string; error?: string }> {
   const { data: order, error } = await supabaseAdmin
@@ -107,6 +107,43 @@ export async function runTonCheck(): Promise<{ scanned: number; orderMatches: nu
       lt: tx.transaction_id.lt,
       matched_order_id: matchedOrderId,
     });
+  }
+
+  // ============ USDT jetton scan ============
+  try {
+    const usdtEvents = await fetchIncomingUsdtJettons(address, 40);
+    const { data: rateRow } = await supabaseAdmin
+      .from("settings").select("value").eq("key", "usdt_per_ton").maybeSingle();
+    const usdtPerTon = Number(rateRow?.value ?? "2.3") || 2.3;
+
+    for (const ev of usdtEvents) {
+      if (!ev.memo) continue;
+      // dedup via tx_hash uniqueness on deposits
+      const { data: seen } = await supabaseAdmin
+        .from("deposits").select("id").eq("tx_hash", ev.hash).maybeSingle();
+      if (seen) continue;
+
+      const { data: profile } = await supabaseAdmin
+        .from("profiles").select("user_id").eq("deposit_memo", ev.memo).maybeSingle();
+      if (!profile) continue;
+
+      const amountTonEquivalent = ev.amount / usdtPerTon;
+      const { error: depErr } = await supabaseAdmin.from("deposits").insert({
+        user_id: profile.user_id,
+        amount_ton: amountTonEquivalent,
+        tx_hash: ev.hash,
+        memo: ev.memo,
+        from_addr: ev.from,
+        status: "confirmed",
+        asset: "USDT",
+      });
+      if (!depErr) {
+        await supabaseAdmin.rpc("credit_balance", { _user: profile.user_id, _amount: amountTonEquivalent });
+        depositCredits++;
+      }
+    }
+  } catch {
+    // silent — USDT scan is best-effort
   }
 
   return { scanned: txs.length, orderMatches, depositCredits, pushed };

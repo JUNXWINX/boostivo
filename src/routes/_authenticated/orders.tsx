@@ -12,9 +12,9 @@ import { supabase } from "@/integrations/supabase/client";
 export const Route = createFileRoute("/_authenticated/orders")({
   head: () => ({
     meta: [
-      { title: "Mes commandes — Boostvari" },
-      { name: "description", content: "Suivez en temps réel vos commandes SMM Boostvari : statut du paiement TON et progression de la livraison." },
-      { property: "og:title", content: "Mes commandes — Boostvari" },
+      { title: "Mes commandes — Boostivo" },
+      { name: "description", content: "Suivez en temps réel vos commandes SMM Boostivo : statut du paiement TON et progression de la livraison." },
+      { property: "og:title", content: "Mes commandes — Boostivo" },
       { property: "og:description", content: "Suivi en temps réel de vos commandes SMM." },
       { property: "og:url", content: "https://boostvari.lovable.app/orders" },
       { name: "robots", content: "noindex" },
@@ -26,7 +26,7 @@ export const Route = createFileRoute("/_authenticated/orders")({
 
 function OrdersPage() {
   const qc = useQueryClient();
-  const { currency } = useCurrency();
+  const { currency, rates } = useCurrency();
   const { data: orders = [], isLoading, refetch, isFetching } = useQuery({
     queryKey: ["my-orders"],
     queryFn: () => getMyOrders(),
@@ -113,7 +113,7 @@ function OrdersPage() {
                       </p>
                     </div>
                     <div className="text-right">
-                      <p className="text-sm font-bold">{formatPrice(o.amount_ton, currency)}</p>
+                      <p className="text-sm font-bold">{formatPrice(o.amount_ton, currency, rates)}</p>
                       <StatusBadge status={o.status} />
                       {o.status === "pending" && (
                         <Link to="/order/$code" params={{ code: o.public_code }} className="mt-1 block text-[11px] text-primary underline">

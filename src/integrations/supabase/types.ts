@@ -17,6 +17,7 @@ export type Database = {
       deposits: {
         Row: {
           amount_ton: number
+          asset: string
           created_at: string
           from_addr: string | null
           id: string
@@ -27,6 +28,7 @@ export type Database = {
         }
         Insert: {
           amount_ton: number
+          asset?: string
           created_at?: string
           from_addr?: string | null
           id?: string
@@ -37,6 +39,7 @@ export type Database = {
         }
         Update: {
           amount_ton?: number
+          asset?: string
           created_at?: string
           from_addr?: string | null
           id?: string
@@ -148,6 +151,7 @@ export type Database = {
       services: {
         Row: {
           active: boolean
+          avg_time: string | null
           category: string | null
           id: string
           max_qty: number
@@ -157,11 +161,13 @@ export type Database = {
           provider_id: string
           rate_per_1k: number
           rate_per_1k_ton: number
+          remarks: string | null
           type: string | null
           updated_at: string
         }
         Insert: {
           active?: boolean
+          avg_time?: string | null
           category?: string | null
           id?: string
           max_qty?: number
@@ -171,11 +177,13 @@ export type Database = {
           provider_id: string
           rate_per_1k?: number
           rate_per_1k_ton?: number
+          remarks?: string | null
           type?: string | null
           updated_at?: string
         }
         Update: {
           active?: boolean
+          avg_time?: string | null
           category?: string | null
           id?: string
           max_qty?: number
@@ -185,6 +193,7 @@ export type Database = {
           provider_id?: string
           rate_per_1k?: number
           rate_per_1k_ton?: number
+          remarks?: string | null
           type?: string | null
           updated_at?: string
         }

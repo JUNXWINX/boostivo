@@ -13,9 +13,9 @@ import { supabase } from "@/integrations/supabase/client";
 export const Route = createFileRoute("/_authenticated/wallet")({
   head: () => ({
     meta: [
-      { title: "Portefeuille TON — Boostvari" },
-      { name: "description", content: "Gérez votre solde TON Boostvari : rechargez votre portefeuille avec un memo unique et suivez l'historique de vos dépôts." },
-      { property: "og:title", content: "Portefeuille TON — Boostvari" },
+      { title: "Portefeuille TON — Boostivo" },
+      { name: "description", content: "Gérez votre solde TON Boostivo : rechargez votre portefeuille avec un memo unique et suivez l'historique de vos dépôts." },
+      { property: "og:title", content: "Portefeuille TON — Boostivo" },
       { property: "og:description", content: "Rechargez votre solde TON et suivez l'historique de vos dépôts." },
       { property: "og:url", content: "https://boostvari.lovable.app/wallet" },
       { name: "robots", content: "noindex" },
@@ -40,7 +40,7 @@ function CopyBtn({ value }: { value: string }) {
 
 function WalletPage() {
   const qc = useQueryClient();
-  const { currency } = useCurrency();
+  const { currency, rates } = useCurrency();
   const { data: profile, isLoading } = useQuery({ queryKey: ["my-profile"], queryFn: () => getMyProfile() });
   const { data: deposits = [] } = useQuery({ queryKey: ["my-deposits"], queryFn: () => getMyDeposits() });
 
@@ -80,7 +80,7 @@ function WalletPage() {
 
   return (
     <AppShell>
-      <h1 className="sr-only">Votre portefeuille TON Boostvari</h1>
+      <h1 className="sr-only">Votre portefeuille TON Boostivo</h1>
       <div className="space-y-4">
         {/* Balance card */}
         <div className="rounded-3xl glass-strong p-5">
@@ -88,7 +88,7 @@ function WalletPage() {
             <div>
               <p className="text-xs uppercase tracking-wider text-muted-foreground">Bonjour, @{profile.username}</p>
               <p className="mt-1 text-xs text-muted-foreground">Solde disponible</p>
-              <p className="text-3xl font-bold text-emerald-600">{formatPrice(profile.balance_ton, currency)}</p>
+              <p className="text-3xl font-bold text-emerald-600">{formatPrice(profile.balance_ton, currency, rates)}</p>
               <p className="mt-0.5 text-xs text-muted-foreground">≈ {formatTon(profile.balance_ton)}</p>
             </div>
             <button
@@ -164,7 +164,7 @@ function WalletPage() {
               {deposits.map((d) => (
                 <li key={d.id} className="flex items-center justify-between py-3 text-sm">
                   <div>
-                    <p className="font-semibold text-emerald-600">+ {formatPrice(d.amount_ton, currency)}</p>
+                    <p className="font-semibold text-emerald-600">+ {formatPrice(d.amount_ton, currency, rates)}</p>
                     <p className="text-[11px] text-muted-foreground">{new Date(d.created_at).toLocaleString("fr-FR")}</p>
                   </div>
                   <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-medium text-emerald-700">✓ Confirmé</span>

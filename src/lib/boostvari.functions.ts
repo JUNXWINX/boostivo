@@ -19,7 +19,7 @@ export const listServices = createServerFn({ method: "GET" }).handler(async () =
   const sb = await publicClient();
   const { data, error } = await sb
     .from("services")
-    .select("id, provider_id, name, category, platform, type, rate_per_1k_ton, min_qty, max_qty")
+    .select("id, provider_id, name, category, platform, type, rate_per_1k_ton, min_qty, max_qty, avg_time, remarks")
     .eq("active", true)
     .order("platform", { ascending: true })
     .order("name", { ascending: true });
@@ -27,14 +27,16 @@ export const listServices = createServerFn({ method: "GET" }).handler(async () =
   return data ?? [];
 });
 
-// Public: rates (XOF/USD per TON)
+// Public: rates (XOF/USD/USDT per TON)
 export const getRates = createServerFn({ method: "GET" }).handler(async () => {
   const sb = await publicClient();
-  const { data } = await sb.from("settings").select("key, value").in("key", ["xof_per_ton", "usd_per_ton"]);
+  const { data } = await sb.from("settings").select("key, value").in("key", ["xof_per_ton", "usd_per_ton", "usdt_per_ton"]);
   const map = new Map((data ?? []).map((r) => [r.key, Number(r.value)]));
+  const usd = map.get("usd_per_ton") || 2.3;
   return {
-    xof_per_ton: map.get("xof_per_ton") || 3300,
-    usd_per_ton: map.get("usd_per_ton") || 5.5,
+    xof_per_ton: map.get("xof_per_ton") || 1400,
+    usd_per_ton: usd,
+    usdt_per_ton: map.get("usdt_per_ton") || usd,
   };
 });
 
@@ -71,7 +73,7 @@ export const getMyProfile = createServerFn({ method: "GET" })
 export const updateMyCurrency = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: { currency: string }) =>
-    z.object({ currency: z.enum(["XOF", "USD", "TON"]) }).parse(d),
+    z.object({ currency: z.enum(["XOF", "USD", "USDT", "TON"]) }).parse(d),
   )
   .handler(async ({ context, data }) => {
     const { error } = await context.supabase
@@ -283,8 +285,8 @@ export const adminSyncServices = createServerFn({ method: "POST" })
 
     const { data: settings } = await supabaseAdmin.from("settings").select("key, value");
     const settingsMap = new Map((settings ?? []).map((s) => [s.key, s.value]));
-    const markup = Number(settingsMap.get("markup_percent") ?? "212.5") / 100;
-    const tonUsd = Number(settingsMap.get("ton_price_usd") ?? settingsMap.get("usd_per_ton") ?? "5.5");
+    const markup = Number(settingsMap.get("markup_percent") ?? "110") / 100; // 110% => ×2.1
+    const tonUsd = Number(settingsMap.get("usd_per_ton") ?? settingsMap.get("ton_price_usd") ?? "2.3");
 
     const services = await fetchServices();
     let upserted = 0;
@@ -294,6 +296,16 @@ export const adminSyncServices = createServerFn({ method: "POST" })
       const rateUsd = Number(s.rate);
       if (!isFinite(rateUsd) || rateUsd <= 0) continue;
       const ratePerKTon = (rateUsd / tonUsd) * (1 + markup);
+      const remarksParts: string[] = [];
+      if (s.description) remarksParts.push(String(s.description));
+      const flags: string[] = [];
+      if (s.refill) flags.push("Refill");
+      if (s.cancel) flags.push("Annulation possible");
+      if (s.dripfeed) flags.push("Dripfeed");
+      if (flags.length) remarksParts.push(flags.join(" · "));
+      const remarks = remarksParts.join(" — ") || null;
+      const avgTime = s.average_time ?? s.avg_time ?? null;
+
       const { error } = await supabaseAdmin.from("services").upsert(
         {
           provider_id: String(s.service),
@@ -301,6 +313,8 @@ export const adminSyncServices = createServerFn({ method: "POST" })
           rate_per_1k: rateUsd,
           rate_per_1k_ton: Number(ratePerKTon.toFixed(6)),
           min_qty: Number(s.min) || 1, max_qty: Number(s.max) || 1_000_000,
+          avg_time: avgTime,
+          remarks,
           active: true, updated_at: new Date().toISOString(),
         }, { onConflict: "provider_id" },
       );
@@ -336,14 +350,20 @@ function guessPlatform(text: string): string {
   const t = text.toLowerCase();
   if (t.includes("whatsapp")) return "WhatsApp";
   if (t.includes("instagram") || t.includes("insta")) return "Instagram";
-  if (t.includes("tiktok")) return "TikTok";
-  if (t.includes("youtube")) return "YouTube";
-  if (t.includes("twitter") || t.includes(" x ") || t.includes("x.com")) return "Twitter";
-  if (t.includes("facebook")) return "Facebook";
-  if (t.includes("telegram")) return "Telegram";
+  if (t.includes("tiktok") || t.includes("douyin")) return "TikTok";
+  if (t.includes("youtube") || t.includes("yt ")) return "YouTube";
+  if (t.includes("twitter") || t.includes(" x ") || t.includes("x.com") || t.includes("/x ") || t.match(/\bx-/) || t.includes("threads")) return "Twitter";
+  if (t.includes("facebook") || t.includes("fb ")) return "Facebook";
+  if (t.includes("telegram") || t.includes("tg ")) return "Telegram";
   if (t.includes("spotify")) return "Spotify";
   if (t.includes("twitch")) return "Twitch";
-  if (t.includes("snapchat")) return "Snapchat";
+  if (t.includes("snapchat") || t.includes("snap ")) return "Snapchat";
   if (t.includes("linkedin")) return "LinkedIn";
+  if (t.includes("discord")) return "Discord";
+  if (t.includes("potato")) return "Potato";
+  if (t.includes("kick.com") || t.match(/\bkick\b/)) return "Kick";
+  if (t.includes("reddit")) return "Reddit";
+  if (t.includes("pinterest")) return "Pinterest";
+  if (t.includes("soundcloud")) return "SoundCloud";
   return "Autre";
 }

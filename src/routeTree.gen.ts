@@ -19,6 +19,7 @@ import { Route as AuthenticatedWalletRouteImport } from './routes/_authenticated
 import { Route as AuthenticatedOrdersRouteImport } from './routes/_authenticated/orders'
 import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated/admin'
 import { Route as ApiPublicTonCheckRouteImport } from './routes/api/public/ton-check'
+import { Route as ApiPublicRefreshRatesRouteImport } from './routes/api/public/refresh-rates'
 
 const SitemapDotxmlRoute = SitemapDotxmlRouteImport.update({
   id: '/sitemap.xml',
@@ -69,6 +70,11 @@ const ApiPublicTonCheckRoute = ApiPublicTonCheckRouteImport.update({
   path: '/api/public/ton-check',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicRefreshRatesRoute = ApiPublicRefreshRatesRouteImport.update({
+  id: '/api/public/refresh-rates',
+  path: '/api/public/refresh-rates',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -79,6 +85,7 @@ export interface FileRoutesByFullPath {
   '/orders': typeof AuthenticatedOrdersRoute
   '/wallet': typeof AuthenticatedWalletRoute
   '/order/$code': typeof OrderCodeRoute
+  '/api/public/refresh-rates': typeof ApiPublicRefreshRatesRoute
   '/api/public/ton-check': typeof ApiPublicTonCheckRoute
 }
 export interface FileRoutesByTo {
@@ -90,6 +97,7 @@ export interface FileRoutesByTo {
   '/orders': typeof AuthenticatedOrdersRoute
   '/wallet': typeof AuthenticatedWalletRoute
   '/order/$code': typeof OrderCodeRoute
+  '/api/public/refresh-rates': typeof ApiPublicRefreshRatesRoute
   '/api/public/ton-check': typeof ApiPublicTonCheckRoute
 }
 export interface FileRoutesById {
@@ -103,6 +111,7 @@ export interface FileRoutesById {
   '/_authenticated/orders': typeof AuthenticatedOrdersRoute
   '/_authenticated/wallet': typeof AuthenticatedWalletRoute
   '/order/$code': typeof OrderCodeRoute
+  '/api/public/refresh-rates': typeof ApiPublicRefreshRatesRoute
   '/api/public/ton-check': typeof ApiPublicTonCheckRoute
 }
 export interface FileRouteTypes {
@@ -116,6 +125,7 @@ export interface FileRouteTypes {
     | '/orders'
     | '/wallet'
     | '/order/$code'
+    | '/api/public/refresh-rates'
     | '/api/public/ton-check'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -127,6 +137,7 @@ export interface FileRouteTypes {
     | '/orders'
     | '/wallet'
     | '/order/$code'
+    | '/api/public/refresh-rates'
     | '/api/public/ton-check'
   id:
     | '__root__'
@@ -139,6 +150,7 @@ export interface FileRouteTypes {
     | '/_authenticated/orders'
     | '/_authenticated/wallet'
     | '/order/$code'
+    | '/api/public/refresh-rates'
     | '/api/public/ton-check'
   fileRoutesById: FileRoutesById
 }
@@ -149,6 +161,7 @@ export interface RootRouteChildren {
   ResetPasswordRoute: typeof ResetPasswordRoute
   SitemapDotxmlRoute: typeof SitemapDotxmlRoute
   OrderCodeRoute: typeof OrderCodeRoute
+  ApiPublicRefreshRatesRoute: typeof ApiPublicRefreshRatesRoute
   ApiPublicTonCheckRoute: typeof ApiPublicTonCheckRoute
 }
 
@@ -224,6 +237,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicTonCheckRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/refresh-rates': {
+      id: '/api/public/refresh-rates'
+      path: '/api/public/refresh-rates'
+      fullPath: '/api/public/refresh-rates'
+      preLoaderRoute: typeof ApiPublicRefreshRatesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -249,6 +269,7 @@ const rootRouteChildren: RootRouteChildren = {
   ResetPasswordRoute: ResetPasswordRoute,
   SitemapDotxmlRoute: SitemapDotxmlRoute,
   OrderCodeRoute: OrderCodeRoute,
+  ApiPublicRefreshRatesRoute: ApiPublicRefreshRatesRoute,
   ApiPublicTonCheckRoute: ApiPublicTonCheckRoute,
 }
 export const routeTree = rootRouteImport

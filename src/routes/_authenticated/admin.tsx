@@ -17,10 +17,10 @@ import { supabase } from "@/integrations/supabase/client";
 export const Route = createFileRoute("/_authenticated/admin")({
   head: () => ({
     meta: [
-      { title: "Panneau d'administration — Boostvari" },
-      { name: "description", content: "Panneau d'administration Boostvari : gérez les commandes, synchronisez les services et suivez les paiements TON." },
-      { property: "og:title", content: "Panneau d'administration — Boostvari" },
-      { property: "og:description", content: "Gérez les commandes et les services Boostvari." },
+      { title: "Panneau d'administration — Boostivo" },
+      { name: "description", content: "Panneau d'administration Boostivo : gérez les commandes, synchronisez les services et suivez les paiements TON." },
+      { property: "og:title", content: "Panneau d'administration — Boostivo" },
+      { property: "og:description", content: "Gérez les commandes et les services Boostivo." },
       { property: "og:url", content: "https://boostvari.lovable.app/admin" },
       { name: "robots", content: "noindex" },
     ],

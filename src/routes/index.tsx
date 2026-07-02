@@ -16,9 +16,9 @@ const ratesQuery = queryOptions({ queryKey: ["rates"], queryFn: () => getRates()
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "Boostvari — SMM Panel avec paiements TON" },
-      { name: "description", content: "Boostvari : SMM panel automatique. Achetez followers, likes et vues sur Instagram, TikTok, Telegram, YouTube. Paiement TON, livraison en quelques minutes." },
-      { property: "og:title", content: "Boostvari — SMM Panel avec paiements TON" },
+      { title: "Boostivo — SMM Panel avec paiements TON" },
+      { name: "description", content: "Boostivo : SMM panel automatique. Achetez followers, likes et vues sur Instagram, TikTok, Telegram, YouTube. Paiement TON, livraison en quelques minutes." },
+      { property: "og:title", content: "Boostivo — SMM Panel avec paiements TON" },
       { property: "og:description", content: "Followers, likes, vues. Paiement TON, livraison automatique." },
       { property: "og:url", content: "https://boostvari.lovable.app/" },
     ],
@@ -141,7 +141,7 @@ function Home() {
 
   return (
     <AppShell>
-      <h1 className="sr-only">Boostvari : SMM Panel avec paiements TON</h1>
+      <h1 className="sr-only">Boostivo : SMM Panel avec paiements TON</h1>
       {/* Network picker */}
       <div className="mb-4 rounded-3xl glass-strong p-4">
         <p className="mb-3 text-center text-[12px] font-bold uppercase tracking-wider text-foreground/80">
@@ -189,7 +189,7 @@ function Home() {
                 onChange={setVariantId}
                 options={variantOpts.map((v) => ({
                   value: v.svc.id,
-                  label: `${v.variant} — ${formatPrice(Number(v.svc.rate_per_1k_ton), currency, { xof: rates.xof_per_ton, usd: rates.usd_per_ton })} / 1k`,
+                  label: `${v.variant} — ${formatPrice(Number(v.svc.rate_per_1k_ton), currency, { xof: rates.xof_per_ton, usd: rates.usd_per_ton, usdt: rates.usdt_per_ton })} / 1k`,
                 }))}
               />
             </Field>
@@ -239,13 +239,31 @@ function Home() {
           <div className="flex flex-wrap items-center gap-3 rounded-2xl glass p-4">
             <span className="text-sm font-bold">Prix :</span>
             <span className="rounded-lg bg-emerald-500 px-4 py-2 text-lg font-bold text-white shadow">
-              {formatPrice(priceTon, currency, { xof: rates.xof_per_ton, usd: rates.usd_per_ton })}
+              {formatPrice(priceTon, currency, { xof: rates.xof_per_ton, usd: rates.usd_per_ton, usdt: rates.usdt_per_ton })}
             </span>
             <span className="text-xs text-muted-foreground">≈ {formatTon(priceTon)}</span>
             <div className="basis-full text-xs text-muted-foreground">
-              ({formatPrice(rateRow, currency, { xof: rates.xof_per_ton, usd: rates.usd_per_ton })} / 1k {decode(serviceGroup).toLowerCase()})
+              ({formatPrice(rateRow, currency, { xof: rates.xof_per_ton, usd: rates.usd_per_ton, usdt: rates.usdt_per_ton })} / 1k {decode(serviceGroup).toLowerCase()})
             </div>
           </div>
+
+          {/* Info fournisseur : temps moyen + remarques natives */}
+          {(selected.avg_time || selected.remarks) && (
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+              {selected.avg_time && (
+                <div className="rounded-2xl glass p-3">
+                  <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Temps moyen</p>
+                  <p className="mt-1 text-sm font-semibold">{selected.avg_time}</p>
+                </div>
+              )}
+              {selected.remarks && (
+                <div className="rounded-2xl glass p-3">
+                  <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Description</p>
+                  <p className="mt-1 text-xs text-foreground/80">{selected.remarks}</p>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Remark — adapté au service sélectionné */}
           <div className="rounded-2xl glass p-4">
@@ -256,6 +274,7 @@ function Home() {
               ))}
             </ol>
           </div>
+
 
           {mutation.isError && (
             <div className="rounded-xl border border-destructive/50 bg-destructive/10 p-3 text-sm text-destructive">
