@@ -247,6 +247,24 @@ function Home() {
             </div>
           </div>
 
+          {/* Info fournisseur : temps moyen + remarques natives */}
+          {(selected.avg_time || selected.remarks) && (
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+              {selected.avg_time && (
+                <div className="rounded-2xl glass p-3">
+                  <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Temps moyen</p>
+                  <p className="mt-1 text-sm font-semibold">{selected.avg_time}</p>
+                </div>
+              )}
+              {selected.remarks && (
+                <div className="rounded-2xl glass p-3">
+                  <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Description</p>
+                  <p className="mt-1 text-xs text-foreground/80">{selected.remarks}</p>
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Remark — adapté au service sélectionné */}
           <div className="rounded-2xl glass p-4">
             <p className="text-sm font-bold">Remarque :</p>
@@ -256,6 +274,7 @@ function Home() {
               ))}
             </ol>
           </div>
+
 
           {mutation.isError && (
             <div className="rounded-xl border border-destructive/50 bg-destructive/10 p-3 text-sm text-destructive">
