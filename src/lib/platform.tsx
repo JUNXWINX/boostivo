@@ -192,8 +192,14 @@ export const PLATFORM_ORDER = [
   "Twitter",
   "Snapchat",
   "Twitch",
+  "Kick",
+  "Discord",
+  "Potato",
   "Spotify",
+  "SoundCloud",
   "LinkedIn",
+  "Reddit",
+  "Pinterest",
   "Autre",
 ];
 
