@@ -350,14 +350,20 @@ function guessPlatform(text: string): string {
   const t = text.toLowerCase();
   if (t.includes("whatsapp")) return "WhatsApp";
   if (t.includes("instagram") || t.includes("insta")) return "Instagram";
-  if (t.includes("tiktok")) return "TikTok";
-  if (t.includes("youtube")) return "YouTube";
-  if (t.includes("twitter") || t.includes(" x ") || t.includes("x.com")) return "Twitter";
-  if (t.includes("facebook")) return "Facebook";
-  if (t.includes("telegram")) return "Telegram";
+  if (t.includes("tiktok") || t.includes("douyin")) return "TikTok";
+  if (t.includes("youtube") || t.includes("yt ")) return "YouTube";
+  if (t.includes("twitter") || t.includes(" x ") || t.includes("x.com") || t.includes("/x ") || t.match(/\bx-/) || t.includes("threads")) return "Twitter";
+  if (t.includes("facebook") || t.includes("fb ")) return "Facebook";
+  if (t.includes("telegram") || t.includes("tg ")) return "Telegram";
   if (t.includes("spotify")) return "Spotify";
   if (t.includes("twitch")) return "Twitch";
-  if (t.includes("snapchat")) return "Snapchat";
+  if (t.includes("snapchat") || t.includes("snap ")) return "Snapchat";
   if (t.includes("linkedin")) return "LinkedIn";
+  if (t.includes("discord")) return "Discord";
+  if (t.includes("potato")) return "Potato";
+  if (t.includes("kick.com") || t.match(/\bkick\b/)) return "Kick";
+  if (t.includes("reddit")) return "Reddit";
+  if (t.includes("pinterest")) return "Pinterest";
+  if (t.includes("soundcloud")) return "SoundCloud";
   return "Autre";
 }
