@@ -19,7 +19,7 @@ export const listServices = createServerFn({ method: "GET" }).handler(async () =
   const sb = await publicClient();
   const { data, error } = await sb
     .from("services")
-    .select("id, provider_id, name, category, platform, type, rate_per_1k_ton, min_qty, max_qty")
+    .select("id, provider_id, name, category, platform, type, rate_per_1k_ton, min_qty, max_qty, avg_time, remarks")
     .eq("active", true)
     .order("platform", { ascending: true })
     .order("name", { ascending: true });
