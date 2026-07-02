@@ -26,7 +26,7 @@ export const Route = createFileRoute("/_authenticated/orders")({
 
 function OrdersPage() {
   const qc = useQueryClient();
-  const { currency } = useCurrency();
+  const { currency, rates } = useCurrency();
   const { data: orders = [], isLoading, refetch, isFetching } = useQuery({
     queryKey: ["my-orders"],
     queryFn: () => getMyOrders(),
@@ -113,7 +113,7 @@ function OrdersPage() {
                       </p>
                     </div>
                     <div className="text-right">
-                      <p className="text-sm font-bold">{formatPrice(o.amount_ton, currency)}</p>
+                      <p className="text-sm font-bold">{formatPrice(o.amount_ton, currency, rates)}</p>
                       <StatusBadge status={o.status} />
                       {o.status === "pending" && (
                         <Link to="/order/$code" params={{ code: o.public_code }} className="mt-1 block text-[11px] text-primary underline">
