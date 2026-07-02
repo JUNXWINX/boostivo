@@ -285,8 +285,8 @@ export const adminSyncServices = createServerFn({ method: "POST" })
 
     const { data: settings } = await supabaseAdmin.from("settings").select("key, value");
     const settingsMap = new Map((settings ?? []).map((s) => [s.key, s.value]));
-    const markup = Number(settingsMap.get("markup_percent") ?? "212.5") / 100;
-    const tonUsd = Number(settingsMap.get("ton_price_usd") ?? settingsMap.get("usd_per_ton") ?? "5.5");
+    const markup = Number(settingsMap.get("markup_percent") ?? "110") / 100; // 110% => ×2.1
+    const tonUsd = Number(settingsMap.get("usd_per_ton") ?? settingsMap.get("ton_price_usd") ?? "2.3");
 
     const services = await fetchServices();
     let upserted = 0;
@@ -296,6 +296,16 @@ export const adminSyncServices = createServerFn({ method: "POST" })
       const rateUsd = Number(s.rate);
       if (!isFinite(rateUsd) || rateUsd <= 0) continue;
       const ratePerKTon = (rateUsd / tonUsd) * (1 + markup);
+      const remarksParts: string[] = [];
+      if (s.description) remarksParts.push(String(s.description));
+      const flags: string[] = [];
+      if (s.refill) flags.push("Refill");
+      if (s.cancel) flags.push("Annulation possible");
+      if (s.dripfeed) flags.push("Dripfeed");
+      if (flags.length) remarksParts.push(flags.join(" · "));
+      const remarks = remarksParts.join(" — ") || null;
+      const avgTime = s.average_time ?? s.avg_time ?? null;
+
       const { error } = await supabaseAdmin.from("services").upsert(
         {
           provider_id: String(s.service),
@@ -303,6 +313,8 @@ export const adminSyncServices = createServerFn({ method: "POST" })
           rate_per_1k: rateUsd,
           rate_per_1k_ton: Number(ratePerKTon.toFixed(6)),
           min_qty: Number(s.min) || 1, max_qty: Number(s.max) || 1_000_000,
+          avg_time: avgTime,
+          remarks,
           active: true, updated_at: new Date().toISOString(),
         }, { onConflict: "provider_id" },
       );
