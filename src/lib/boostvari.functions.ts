@@ -73,7 +73,7 @@ export const getMyProfile = createServerFn({ method: "GET" })
 export const updateMyCurrency = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: { currency: string }) =>
-    z.object({ currency: z.enum(["XOF", "USD", "TON"]) }).parse(d),
+    z.object({ currency: z.enum(["XOF", "USD", "USDT", "TON"]) }).parse(d),
   )
   .handler(async ({ context, data }) => {
     const { error } = await context.supabase
