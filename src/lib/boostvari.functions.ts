@@ -27,14 +27,16 @@ export const listServices = createServerFn({ method: "GET" }).handler(async () =
   return data ?? [];
 });
 
-// Public: rates (XOF/USD per TON)
+// Public: rates (XOF/USD/USDT per TON)
 export const getRates = createServerFn({ method: "GET" }).handler(async () => {
   const sb = await publicClient();
-  const { data } = await sb.from("settings").select("key, value").in("key", ["xof_per_ton", "usd_per_ton"]);
+  const { data } = await sb.from("settings").select("key, value").in("key", ["xof_per_ton", "usd_per_ton", "usdt_per_ton"]);
   const map = new Map((data ?? []).map((r) => [r.key, Number(r.value)]));
+  const usd = map.get("usd_per_ton") || 2.3;
   return {
-    xof_per_ton: map.get("xof_per_ton") || 3300,
-    usd_per_ton: map.get("usd_per_ton") || 5.5,
+    xof_per_ton: map.get("xof_per_ton") || 1400,
+    usd_per_ton: usd,
+    usdt_per_ton: map.get("usdt_per_ton") || usd,
   };
 });
 
