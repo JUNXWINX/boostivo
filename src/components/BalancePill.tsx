@@ -9,7 +9,7 @@ import { formatPrice } from "@/lib/format";
 
 export function BalancePill() {
   const [signedIn, setSignedIn] = useState<boolean | null>(null);
-  const { currency } = useCurrency();
+  const { currency, rates } = useCurrency();
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => setSignedIn(!!data.session));
