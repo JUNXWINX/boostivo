@@ -29,7 +29,7 @@ export function AppShell({ children, right }: { children: ReactNode; right?: Rea
       </header>
       <main className="mx-auto max-w-5xl px-3 py-4 sm:px-4 sm:py-6">{children}</main>
       <footer className="mx-auto max-w-5xl px-4 py-8 text-center text-[11px] text-muted-foreground">
-        Boostvari — Paiements 100% en TON · Livraison automatique
+        Boostivo — Paiements 100% en TON · Livraison automatique
       </footer>
     </div>
   );

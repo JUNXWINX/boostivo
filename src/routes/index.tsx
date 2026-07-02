@@ -16,9 +16,9 @@ const ratesQuery = queryOptions({ queryKey: ["rates"], queryFn: () => getRates()
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "Boostvari — SMM Panel avec paiements TON" },
-      { name: "description", content: "Boostvari : SMM panel automatique. Achetez followers, likes et vues sur Instagram, TikTok, Telegram, YouTube. Paiement TON, livraison en quelques minutes." },
-      { property: "og:title", content: "Boostvari — SMM Panel avec paiements TON" },
+      { title: "Boostivo — SMM Panel avec paiements TON" },
+      { name: "description", content: "Boostivo : SMM panel automatique. Achetez followers, likes et vues sur Instagram, TikTok, Telegram, YouTube. Paiement TON, livraison en quelques minutes." },
+      { property: "og:title", content: "Boostivo — SMM Panel avec paiements TON" },
       { property: "og:description", content: "Followers, likes, vues. Paiement TON, livraison automatique." },
       { property: "og:url", content: "https://boostvari.lovable.app/" },
     ],
@@ -141,7 +141,7 @@ function Home() {
 
   return (
     <AppShell>
-      <h1 className="sr-only">Boostvari : SMM Panel avec paiements TON</h1>
+      <h1 className="sr-only">Boostivo : SMM Panel avec paiements TON</h1>
       {/* Network picker */}
       <div className="mb-4 rounded-3xl glass-strong p-4">
         <p className="mb-3 text-center text-[12px] font-bold uppercase tracking-wider text-foreground/80">

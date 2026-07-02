@@ -8,9 +8,9 @@ export const Route = createFileRoute("/reset-password")({
   ssr: false,
   head: () => ({
     meta: [
-      { title: "Nouveau mot de passe — Boostvari" },
-      { name: "description", content: "Définissez un nouveau mot de passe pour votre compte Boostvari." },
-      { property: "og:title", content: "Nouveau mot de passe — Boostvari" },
+      { title: "Nouveau mot de passe — Boostivo" },
+      { name: "description", content: "Définissez un nouveau mot de passe pour votre compte Boostivo." },
+      { property: "og:title", content: "Nouveau mot de passe — Boostivo" },
       { property: "og:url", content: "https://boostvari.lovable.app/reset-password" },
       { name: "robots", content: "noindex" },
     ],

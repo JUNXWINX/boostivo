@@ -13,9 +13,9 @@ import { supabase } from "@/integrations/supabase/client";
 export const Route = createFileRoute("/_authenticated/wallet")({
   head: () => ({
     meta: [
-      { title: "Portefeuille TON — Boostvari" },
-      { name: "description", content: "Gérez votre solde TON Boostvari : rechargez votre portefeuille avec un memo unique et suivez l'historique de vos dépôts." },
-      { property: "og:title", content: "Portefeuille TON — Boostvari" },
+      { title: "Portefeuille TON — Boostivo" },
+      { name: "description", content: "Gérez votre solde TON Boostivo : rechargez votre portefeuille avec un memo unique et suivez l'historique de vos dépôts." },
+      { property: "og:title", content: "Portefeuille TON — Boostivo" },
       { property: "og:description", content: "Rechargez votre solde TON et suivez l'historique de vos dépôts." },
       { property: "og:url", content: "https://boostvari.lovable.app/wallet" },
       { name: "robots", content: "noindex" },
@@ -80,7 +80,7 @@ function WalletPage() {
 
   return (
     <AppShell>
-      <h1 className="sr-only">Votre portefeuille TON Boostvari</h1>
+      <h1 className="sr-only">Votre portefeuille TON Boostivo</h1>
       <div className="space-y-4">
         {/* Balance card */}
         <div className="rounded-3xl glass-strong p-5">

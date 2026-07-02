@@ -33,7 +33,7 @@
 
 :root {
   --radius: 1rem;
-  /* Light, frosted, liquid-glass Boostvari theme */
+  /* Light, frosted, liquid-glass Boostivo theme */
   --background: oklch(0.98 0.01 240);
   --foreground: oklch(0.18 0.03 250);
   --card: oklch(1 0 0);

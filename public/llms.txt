@@ -1,8 +1,8 @@
-# Boostvari
+# Boostivo
 
 > SMM Panel automatique avec paiements TON : achetez followers, likes et vues sur Instagram, TikTok, Telegram, YouTube et plus. Livraison automatique après réception du paiement TON.
 
-Boostvari est une plateforme marketplace de services de marketing pour réseaux sociaux (SMM). Les paiements se font exclusivement en TON (The Open Network) et les commandes sont transmises automatiquement au fournisseur dès réception.
+Boostivo est une plateforme marketplace de services de marketing pour réseaux sociaux (SMM). Les paiements se font exclusivement en TON (The Open Network) et les commandes sont transmises automatiquement au fournisseur dès réception.
 
 ## Pages
 
