@@ -15,11 +15,12 @@ async function refresh(): Promise<Response> {
     if (!price || !price.usd) return Response.json({ ok: false, error: "no price" }, { status: 502 });
 
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    // NB: xof_per_ton is an internal pricing rate (fixed at 3300 XOF/TON) — do NOT overwrite from market feed,
+    // otherwise service XOF prices fluctuate with TON's market price.
     const updates: Array<{ key: string; value: string }> = [
       { key: "usd_per_ton", value: String(price.usd) },
       { key: "usdt_per_ton", value: String(price.usd) },
     ];
-    if (price.xof) updates.push({ key: "xof_per_ton", value: String(Math.round(price.xof)) });
 
     for (const u of updates) {
       await supabaseAdmin.from("settings").upsert(
