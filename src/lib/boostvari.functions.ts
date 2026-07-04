@@ -46,10 +46,14 @@ export const checkUsername = createServerFn({ method: "GET" })
     z.object({ username: z.string().min(3).max(24).regex(/^[a-z0-9_]+$/i) }).parse(d),
   )
   .handler(async ({ data }) => {
-    const sb = await publicClient();
-    const { data: ok, error } = await sb.rpc("is_username_available", { _username: data.username });
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: row, error } = await supabaseAdmin
+      .from("profiles")
+      .select("user_id")
+      .ilike("username", data.username)
+      .maybeSingle();
     if (error) throw new Error(error.message);
-    return { available: !!ok };
+    return { available: !row };
   });
 
 // Authenticated: my profile
