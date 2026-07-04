@@ -19,7 +19,7 @@ export const Route = createFileRoute("/")({
       { title: "Boostivo — SMM Panel avec paiements TON" },
       { name: "description", content: "Boostivo : SMM panel automatique. Achetez followers, likes et vues sur Instagram, TikTok, Telegram, YouTube. Paiement TON, livraison en quelques minutes." },
       { property: "og:title", content: "Boostivo — SMM Panel avec paiements TON" },
-      { property: "og:description", content: "Followers, likes, vues. Paiement TON, livraison automatique." },
+      { property: "og:description", content: "Parcourez notre catalogue SMM : followers Instagram, membres Telegram, vues TikTok et YouTube. Paiement TON, tarifs en XOF/USD, livraison en quelques minutes." },
       { property: "og:url", content: "https://boostvari.lovable.app/" },
     ],
     links: [{ rel: "canonical", href: "https://boostvari.lovable.app/" }],
