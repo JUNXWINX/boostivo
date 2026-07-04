@@ -1,11 +1,25 @@
 import { createFileRoute } from "@tanstack/react-router";
 
+function checkAuth(request: Request): Response | null {
+  const secret = process.env.CRON_SECRET;
+  if (!secret) return new Response("Server misconfigured", { status: 500 });
+  const header = request.headers.get("authorization") ?? "";
+  const provided = header.startsWith("Bearer ") ? header.slice(7) : header;
+  if (provided.length !== secret.length) return new Response("Unauthorized", { status: 401 });
+  let diff = 0;
+  for (let i = 0; i < secret.length; i++) diff |= secret.charCodeAt(i) ^ provided.charCodeAt(i);
+  if (diff !== 0) return new Response("Unauthorized", { status: 401 });
+  return null;
+}
+
 /**
  * Refreshes TON price rates every 30 seconds via pg_cron.
  * Fetches from CoinGecko (public, no API key required).
- * Updates settings.xof_per_ton, usd_per_ton, usdt_per_ton.
+ * Updates settings.usd_per_ton, usdt_per_ton. Requires CRON_SECRET bearer.
  */
-async function refresh(): Promise<Response> {
+async function refresh(request: Request): Promise<Response> {
+  const unauth = checkAuth(request);
+  if (unauth) return unauth;
   try {
     const url = "https://api.coingecko.com/api/v3/simple/price?ids=the-open-network&vs_currencies=usd,xof";
     const res = await fetch(url, { headers: { accept: "application/json" } });
@@ -15,8 +29,6 @@ async function refresh(): Promise<Response> {
     if (!price || !price.usd) return Response.json({ ok: false, error: "no price" }, { status: 502 });
 
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    // NB: xof_per_ton is an internal pricing rate (fixed at 3300 XOF/TON) — do NOT overwrite from market feed,
-    // otherwise service XOF prices fluctuate with TON's market price.
     const updates: Array<{ key: string; value: string }> = [
       { key: "usd_per_ton", value: String(price.usd) },
       { key: "usdt_per_ton", value: String(price.usd) },
@@ -38,8 +50,8 @@ async function refresh(): Promise<Response> {
 export const Route = createFileRoute("/api/public/refresh-rates")({
   server: {
     handlers: {
-      GET: refresh,
-      POST: refresh,
+      GET: async ({ request }) => refresh(request),
+      POST: async ({ request }) => refresh(request),
     },
   },
 });
