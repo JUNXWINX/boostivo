@@ -65,7 +65,7 @@ function ResetPage() {
                 placeholder="Nouveau mot de passe"
                 className="w-full rounded-xl border border-white/70 bg-white/80 px-3 py-2.5 pr-10 text-sm outline-none ring-primary focus:ring-2"
               />
-              <button type="button" onClick={() => setShowPwd(v => !v)} className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-muted-foreground">
+              <button type="button" onClick={() => setShowPwd(v => !v)} aria-label={showPwd ? "Masquer le mot de passe" : "Afficher le mot de passe"} className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-muted-foreground">
                 {showPwd ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
               </button>
             </div>
