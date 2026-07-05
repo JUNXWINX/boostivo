@@ -144,9 +144,9 @@ function Home() {
       <h1 className="sr-only">Boostivo : SMM Panel avec paiements TON</h1>
       {/* Network picker */}
       <div className="mb-4 rounded-3xl glass-strong p-4">
-        <p className="mb-3 text-center text-[12px] font-bold uppercase tracking-wider text-foreground/80">
+        <h2 className="mb-3 text-center text-[12px] font-bold uppercase tracking-wider text-foreground/80">
           Choisissez votre réseau social cible :
-        </p>
+        </h2>
         <div className="flex flex-wrap justify-center gap-2">
           {platforms.map((p) => {
             const pi = getPlatform(p);
@@ -267,7 +267,7 @@ function Home() {
 
           {/* Remark — adapté au service sélectionné */}
           <div className="rounded-2xl glass p-4">
-            <p className="text-sm font-bold">Remarque :</p>
+            <h2 className="text-sm font-bold">Remarque :</h2>
             <ol className="mt-2 list-decimal space-y-1.5 pl-5 text-xs text-foreground/80">
               {getServiceRemarks(platform, selected.name).map((r, i) => (
                 <li key={i}>{r}</li>
