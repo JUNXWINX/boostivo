@@ -241,7 +241,7 @@ function Home() {
             <span className="rounded-lg bg-emerald-500 px-4 py-2 text-lg font-bold text-white shadow">
               {formatPrice(priceTon, currency, { xof: rates.xof_per_ton, usd: rates.usd_per_ton, usdt: rates.usdt_per_ton })}
             </span>
-            <span className="text-xs text-muted-foreground">≈ {formatTon(priceTon)}</span>
+            
             <div className="basis-full text-xs text-muted-foreground">
               ({formatPrice(rateRow, currency, { xof: rates.xof_per_ton, usd: rates.usd_per_ton, usdt: rates.usdt_per_ton })} / 1k {decode(serviceGroup).toLowerCase()})
             </div>
