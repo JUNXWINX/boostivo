@@ -89,7 +89,7 @@ function WalletPage() {
               <p className="text-xs uppercase tracking-wider text-muted-foreground">Bonjour, @{profile.username}</p>
               <p className="mt-1 text-xs text-muted-foreground">Solde disponible</p>
               <p className="text-3xl font-bold text-emerald-600">{formatPrice(profile.balance_ton, currency, rates)}</p>
-              <p className="mt-0.5 text-xs text-muted-foreground">≈ {formatTon(profile.balance_ton)}</p>
+              
             </div>
             <button
               onClick={async () => { await supabase.auth.signOut(); window.location.href = "/"; }}
