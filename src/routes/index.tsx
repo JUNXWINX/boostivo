@@ -267,7 +267,7 @@ function Home() {
 
           {/* Remark — adapté au service sélectionné */}
           <div className="rounded-2xl glass p-4">
-            <p className="text-sm font-bold">Remarque :</p>
+            <h2 className="text-sm font-bold">Remarque :</h2>
             <ol className="mt-2 list-decimal space-y-1.5 pl-5 text-xs text-foreground/80">
               {getServiceRemarks(platform, selected.name).map((r, i) => (
                 <li key={i}>{r}</li>
