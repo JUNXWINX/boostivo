@@ -13,6 +13,9 @@ export const Route = createFileRoute("/sitemap.xml")({
   server: {
     handlers: {
       GET: async () => {
+        // Auth-gated routes (/admin, /orders, /wallet) and dynamic guest order
+        // pages (/order/$code) are intentionally excluded — nothing indexable.
+        // /reset-password is noindex, so it's also excluded.
         const entries: SitemapEntry[] = [
           { path: "/", changefreq: "weekly", priority: "1.0" },
           { path: "/auth", changefreq: "monthly", priority: "0.3" },
