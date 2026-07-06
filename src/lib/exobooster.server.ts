@@ -53,6 +53,26 @@ export async function addOrder(input: {
   return { order: data.order, error: data.error, raw: data };
 }
 
-export async function fetchOrderStatus(providerOrderId: string): Promise<unknown> {
-  return call({ action: "status", order: providerOrderId });
+export type ProviderStatus = {
+  charge?: string;
+  start_count?: string | number;
+  status?: string;
+  remains?: string | number;
+  currency?: string;
+  error?: string;
+};
+
+export async function fetchOrderStatus(providerOrderId: string): Promise<ProviderStatus> {
+  const data = (await call({ action: "status", order: providerOrderId })) as ProviderStatus;
+  return data;
+}
+
+export async function fetchMultiOrderStatus(providerOrderIds: string[]): Promise<Record<string, ProviderStatus>> {
+  if (!providerOrderIds.length) return {};
+  const data = (await call({ action: "status", orders: providerOrderIds.join(",") })) as Record<string, ProviderStatus>;
+  return data && typeof data === "object" ? data : {};
+}
+
+export async function fetchBalance(): Promise<{ balance?: string; currency?: string; error?: string }> {
+  return (await call({ action: "balance" })) as { balance?: string; currency?: string; error?: string };
 }
