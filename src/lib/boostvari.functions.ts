@@ -203,11 +203,17 @@ export const createOrder = createServerFn({ method: "POST" })
       throw new Error(error.message);
     }
 
-    // push to provider if paid by balance
+    // push to provider if paid by balance — await so status reflects the outcome
+    // (fire-and-forget doesn't survive on serverless workers)
     if (usedBalance) {
-      const { pushToProvider } = await import("./processing.server");
-      pushToProvider(inserted.id).catch((e) => console.error("[order] push failed", e));
+      try {
+        const { pushToProvider } = await import("./processing.server");
+        await pushToProvider(inserted.id);
+      } catch (e) {
+        console.error("[order] push failed", e);
+      }
     }
+
 
     return {
       id: inserted.id,
