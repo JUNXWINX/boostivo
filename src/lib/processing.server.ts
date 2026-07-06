@@ -65,12 +65,12 @@ export async function syncUserOpenOrders(userId: string): Promise<{ synced: numb
     const info = batch[String(o.provider_order_id)];
     if (!info) continue;
     const mapped = mapProviderStatus(info.status);
-    const patch: Record<string, unknown> = { provider_response: info as never };
+    const patch: { provider_response: ProviderStatus; status?: "sent" | "completed" | "failed"; completed_at?: string } = { provider_response: info };
     if (mapped && mapped !== o.status) {
       patch.status = mapped;
       if (mapped === "completed") patch.completed_at = new Date().toISOString();
     }
-    await supabaseAdmin.from("orders").update(patch).eq("id", o.id);
+    await supabaseAdmin.from("orders").update(patch as never).eq("id", o.id);
     synced++;
   }
   return { synced };
