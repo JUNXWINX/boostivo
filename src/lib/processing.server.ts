@@ -26,13 +26,13 @@ export async function syncOrderStatus(orderId: string): Promise<{ ok: boolean; s
   try {
     const info = await fetchOrderStatus(order.provider_order_id);
     const mapped = mapProviderStatus(info.status);
-    const patch: Record<string, unknown> = { provider_response: info as never };
+    const patch: { provider_response: ProviderStatus; status?: "sent" | "completed" | "failed"; completed_at?: string } = { provider_response: info };
     if (mapped && mapped !== order.status) {
       patch.status = mapped;
       if (mapped === "completed") patch.completed_at = new Date().toISOString();
     }
-    await supabaseAdmin.from("orders").update(patch).eq("id", orderId);
-    return { ok: true, status: (patch.status as string) || order.status, provider: info };
+    await supabaseAdmin.from("orders").update(patch as never).eq("id", orderId);
+    return { ok: true, status: patch.status || order.status, provider: info };
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     return { ok: false, error: msg };
