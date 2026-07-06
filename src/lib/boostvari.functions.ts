@@ -102,18 +102,31 @@ export const getMyDeposits = createServerFn({ method: "GET" })
     return (data ?? []).map((d) => ({ ...d, amount_ton: Number(d.amount_ton) }));
   });
 
-// Authenticated: my orders history
+// Authenticated: my orders history (auto-syncs open orders with provider)
 export const getMyOrders = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
+    try {
+      const { syncUserOpenOrders } = await import("./processing.server");
+      await syncUserOpenOrders(context.userId);
+    } catch (e) {
+      console.error("[getMyOrders] sync failed", e);
+    }
     const { data, error } = await context.supabase
       .from("orders")
-      .select("id, public_code, link, quantity, amount_ton, status, created_at, sent_at, provider_order_id, service:services(name, platform)")
+      .select("id, public_code, link, quantity, amount_ton, status, created_at, sent_at, completed_at, provider_order_id, provider_response, service:services(name, platform)")
       .eq("user_id", context.userId)
       .order("created_at", { ascending: false })
       .limit(50);
     if (error) throw new Error(error.message);
     return (data ?? []).map((o) => ({ ...o, amount_ton: Number(o.amount_ton) }));
+  });
+
+export const syncMyOrders = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { syncUserOpenOrders } = await import("./processing.server");
+    return syncUserOpenOrders(context.userId);
   });
 
 // Public: TON receive address
