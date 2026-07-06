@@ -111,6 +111,11 @@ function OrdersPage() {
               const svc = o.service as { name?: string; platform?: string } | null;
               const pi = getPlatform(svc?.platform);
               const PIcon = pi.icon;
+              const pr = (o.provider_response ?? null) as { start_count?: string | number; remains?: string | number; status?: string } | null;
+              const startCount = pr?.start_count != null ? Number(pr.start_count) : null;
+              const remains = pr?.remains != null ? Number(pr.remains) : null;
+              const delivered = startCount != null && remains != null ? Math.max(0, o.quantity - remains) : null;
+              const pct = delivered != null ? Math.min(100, Math.round((delivered / o.quantity) * 100)) : null;
               return (
                 <li key={o.id} className="rounded-2xl glass-strong p-4">
                   <div className="flex items-start gap-3">
@@ -127,6 +132,20 @@ function OrdersPage() {
                         Code : <span className="font-mono font-semibold">{o.public_code}</span>
                         {o.provider_order_id && <> · Réf. : <span className="font-mono">{o.provider_order_id}</span></>}
                       </p>
+                      {pct != null && (
+                        <div className="mt-2">
+                          <div className="flex items-center justify-between text-[10px] text-muted-foreground">
+                            <span>Livrés : {formatNumber(delivered!)} / {formatNumber(o.quantity)}</span>
+                            <span>{pct}%</span>
+                          </div>
+                          <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-white/60">
+                            <div className="h-full bg-gradient-to-r from-primary to-sky-500" style={{ width: `${pct}%` }} />
+                          </div>
+                          {startCount != null && (
+                            <p className="mt-0.5 text-[10px] text-muted-foreground">Compteur de départ : {formatNumber(startCount)}</p>
+                          )}
+                        </div>
+                      )}
                     </div>
                     <div className="text-right">
                       <p className="text-sm font-bold">{formatPrice(o.amount_ton, currency, rates)}</p>
