@@ -1,7 +1,81 @@
 // Server-only processing: TON scanner + push to ExoBooster
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
-import { addOrder } from "./exobooster.server";
+import { addOrder, fetchMultiOrderStatus, fetchOrderStatus, type ProviderStatus } from "./exobooster.server";
 import { decodeMemo, fetchIncomingTxs, fetchIncomingUsdtJettons, nanoToTon } from "./ton.server";
+
+// Map ExoBooster/SMM panel status strings to our order_status enum
+export function mapProviderStatus(raw?: string): "sent" | "completed" | "failed" | null {
+  if (!raw) return null;
+  const s = raw.toLowerCase();
+  if (s === "completed") return "completed";
+  if (s === "canceled" || s === "cancelled" || s === "refunded") return "failed";
+  if (s === "partial") return "completed"; // partial delivery — treat as done
+  // pending / in progress / processing / awaiting => still "sent"
+  return "sent";
+}
+
+export async function syncOrderStatus(orderId: string): Promise<{ ok: boolean; status?: string; provider?: ProviderStatus; error?: string }> {
+  const { data: order, error } = await supabaseAdmin
+    .from("orders").select("id, provider_order_id, status")
+    .eq("id", orderId).maybeSingle();
+  if (error || !order) return { ok: false, error: error?.message || "not found" };
+  if (!order.provider_order_id) return { ok: false, error: "no provider_order_id" };
+  if (order.status === "completed" || order.status === "failed" || order.status === "cancelled") {
+    return { ok: true, status: order.status };
+  }
+  try {
+    const info = await fetchOrderStatus(order.provider_order_id);
+    const mapped = mapProviderStatus(info.status);
+    const patch: Record<string, unknown> = { provider_response: info as never };
+    if (mapped && mapped !== order.status) {
+      patch.status = mapped;
+      if (mapped === "completed") patch.completed_at = new Date().toISOString();
+    }
+    await supabaseAdmin.from("orders").update(patch).eq("id", orderId);
+    return { ok: true, status: (patch.status as string) || order.status, provider: info };
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    return { ok: false, error: msg };
+  }
+}
+
+export async function syncUserOpenOrders(userId: string): Promise<{ synced: number }> {
+  const { data: orders } = await supabaseAdmin
+    .from("orders")
+    .select("id, provider_order_id, status")
+    .eq("user_id", userId)
+    .in("status", ["sent", "paid"])
+    .not("provider_order_id", "is", null)
+    .limit(50);
+  if (!orders?.length) return { synced: 0 };
+
+  const ids = orders.map((o) => String(o.provider_order_id)).filter(Boolean);
+  let batch: Record<string, ProviderStatus> = {};
+  try {
+    batch = await fetchMultiOrderStatus(ids);
+  } catch {
+    // fall back to per-order
+    for (const o of orders) {
+      await syncOrderStatus(o.id);
+    }
+    return { synced: orders.length };
+  }
+  let synced = 0;
+  for (const o of orders) {
+    const info = batch[String(o.provider_order_id)];
+    if (!info) continue;
+    const mapped = mapProviderStatus(info.status);
+    const patch: Record<string, unknown> = { provider_response: info as never };
+    if (mapped && mapped !== o.status) {
+      patch.status = mapped;
+      if (mapped === "completed") patch.completed_at = new Date().toISOString();
+    }
+    await supabaseAdmin.from("orders").update(patch).eq("id", o.id);
+    synced++;
+  }
+  return { synced };
+}
+
 
 export async function pushToProvider(orderId: string): Promise<{ ok: boolean; status: string; error?: string }> {
   const { data: order, error } = await supabaseAdmin
