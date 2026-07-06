@@ -158,8 +158,9 @@ function OrderPage() {
         )}
 
         {(order.status === "sent" || order.status === "completed") && order.provider_order_id && (
-          <div className="rounded-2xl border border-emerald-300 bg-emerald-50 p-4 text-sm">
-            ID fournisseur: <span className="font-mono text-emerald-700">{order.provider_order_id}</span>
+          <div className="rounded-2xl border border-emerald-300 bg-emerald-50 p-4 text-sm space-y-2">
+            <div>ID fournisseur: <span className="font-mono text-emerald-700">{order.provider_order_id}</span></div>
+            <ProviderProgress order={order} />
           </div>
         )}
       </div>
