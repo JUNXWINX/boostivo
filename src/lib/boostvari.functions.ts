@@ -239,20 +239,31 @@ export const createOrder = createServerFn({ method: "POST" })
     };
   });
 
-// Public: track an order by public_code
+// Public: track an order by public_code (auto-syncs provider status)
 export const getOrderByCode = createServerFn({ method: "GET" })
   .inputValidator((d: { code: string }) => z.object({ code: z.string().min(4).max(32) }).parse(d))
   .handler(async ({ data }) => {
-    // Server-side lookup by public_code (shared secret in the URL). Uses admin
-    // client so we don't need a public SELECT RLS policy on orders.
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: row, error } = await supabaseAdmin
       .from("orders")
-      .select("id, public_code, memo, amount_ton, link, quantity, status, provider_order_id, created_at, paid_at, sent_at, service:services(name, platform)")
+      .select("id, public_code, memo, amount_ton, link, quantity, status, provider_order_id, provider_response, created_at, paid_at, sent_at, completed_at, service:services(name, platform)")
       .eq("public_code", data.code.toUpperCase())
       .maybeSingle();
     if (error) throw new Error(error.message);
     if (!row) throw new Error("Commande introuvable");
+    // best-effort sync if we have a provider id and order is still open
+    if (row.provider_order_id && (row.status === "sent" || row.status === "paid")) {
+      try {
+        const { syncOrderStatus } = await import("./processing.server");
+        const res = await syncOrderStatus(row.id);
+        if (res.ok && res.provider) {
+          row.provider_response = res.provider as never;
+          if (res.status) row.status = res.status as typeof row.status;
+        }
+      } catch (e) {
+        console.error("[getOrderByCode] sync failed", e);
+      }
+    }
     return {
       ...row,
       amount_ton: Number(row.amount_ton),
