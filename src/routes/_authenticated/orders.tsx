@@ -31,7 +31,12 @@ function OrdersPage() {
   const { data: orders = [], isLoading, refetch, isFetching } = useQuery({
     queryKey: ["my-orders"],
     queryFn: () => getMyOrders(),
-    refetchInterval: 15000,
+    refetchInterval: 20000,
+  });
+  const syncFn = useServerFn(syncMyOrders);
+  const syncMutation = useMutation({
+    mutationFn: () => syncFn(),
+    onSettled: () => qc.invalidateQueries({ queryKey: ["my-orders"] }),
   });
 
   // Realtime: invalidate when any of MY orders change
