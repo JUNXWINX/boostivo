@@ -102,18 +102,31 @@ export const getMyDeposits = createServerFn({ method: "GET" })
     return (data ?? []).map((d) => ({ ...d, amount_ton: Number(d.amount_ton) }));
   });
 
-// Authenticated: my orders history
+// Authenticated: my orders history (auto-syncs open orders with provider)
 export const getMyOrders = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
+    try {
+      const { syncUserOpenOrders } = await import("./processing.server");
+      await syncUserOpenOrders(context.userId);
+    } catch (e) {
+      console.error("[getMyOrders] sync failed", e);
+    }
     const { data, error } = await context.supabase
       .from("orders")
-      .select("id, public_code, link, quantity, amount_ton, status, created_at, sent_at, provider_order_id, service:services(name, platform)")
+      .select("id, public_code, link, quantity, amount_ton, status, created_at, sent_at, completed_at, provider_order_id, provider_response, service:services(name, platform)")
       .eq("user_id", context.userId)
       .order("created_at", { ascending: false })
       .limit(50);
     if (error) throw new Error(error.message);
     return (data ?? []).map((o) => ({ ...o, amount_ton: Number(o.amount_ton) }));
+  });
+
+export const syncMyOrders = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { syncUserOpenOrders } = await import("./processing.server");
+    return syncUserOpenOrders(context.userId);
   });
 
 // Public: TON receive address
@@ -203,11 +216,17 @@ export const createOrder = createServerFn({ method: "POST" })
       throw new Error(error.message);
     }
 
-    // push to provider if paid by balance
+    // push to provider if paid by balance — await so status reflects the outcome
+    // (fire-and-forget doesn't survive on serverless workers)
     if (usedBalance) {
-      const { pushToProvider } = await import("./processing.server");
-      pushToProvider(inserted.id).catch((e) => console.error("[order] push failed", e));
+      try {
+        const { pushToProvider } = await import("./processing.server");
+        await pushToProvider(inserted.id);
+      } catch (e) {
+        console.error("[order] push failed", e);
+      }
     }
+
 
     return {
       id: inserted.id,
@@ -220,20 +239,31 @@ export const createOrder = createServerFn({ method: "POST" })
     };
   });
 
-// Public: track an order by public_code
+// Public: track an order by public_code (auto-syncs provider status)
 export const getOrderByCode = createServerFn({ method: "GET" })
   .inputValidator((d: { code: string }) => z.object({ code: z.string().min(4).max(32) }).parse(d))
   .handler(async ({ data }) => {
-    // Server-side lookup by public_code (shared secret in the URL). Uses admin
-    // client so we don't need a public SELECT RLS policy on orders.
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: row, error } = await supabaseAdmin
       .from("orders")
-      .select("id, public_code, memo, amount_ton, link, quantity, status, provider_order_id, created_at, paid_at, sent_at, service:services(name, platform)")
+      .select("id, public_code, memo, amount_ton, link, quantity, status, provider_order_id, provider_response, created_at, paid_at, sent_at, completed_at, service:services(name, platform)")
       .eq("public_code", data.code.toUpperCase())
       .maybeSingle();
     if (error) throw new Error(error.message);
     if (!row) throw new Error("Commande introuvable");
+    // best-effort sync if we have a provider id and order is still open
+    if (row.provider_order_id && (row.status === "sent" || row.status === "paid")) {
+      try {
+        const { syncOrderStatus } = await import("./processing.server");
+        const res = await syncOrderStatus(row.id);
+        if (res.ok && res.provider) {
+          row.provider_response = res.provider as never;
+          if (res.status) row.status = res.status as typeof row.status;
+        }
+      } catch (e) {
+        console.error("[getOrderByCode] sync failed", e);
+      }
+    }
     return {
       ...row,
       amount_ton: Number(row.amount_ton),

@@ -1,9 +1,10 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
 import { useEffect } from "react";
 import { ListOrdered, PackageOpen, RefreshCw } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
-import { getMyOrders } from "@/lib/boostvari.functions";
+import { getMyOrders, syncMyOrders } from "@/lib/boostvari.functions";
 import { useCurrency } from "@/lib/currency";
 import { formatNumber, formatPrice } from "@/lib/format";
 import { getPlatform } from "@/lib/platform";
@@ -30,7 +31,12 @@ function OrdersPage() {
   const { data: orders = [], isLoading, refetch, isFetching } = useQuery({
     queryKey: ["my-orders"],
     queryFn: () => getMyOrders(),
-    refetchInterval: 15000,
+    refetchInterval: 20000,
+  });
+  const syncFn = useServerFn(syncMyOrders);
+  const syncMutation = useMutation({
+    mutationFn: () => syncFn(),
+    onSettled: () => qc.invalidateQueries({ queryKey: ["my-orders"] }),
   });
 
   // Realtime: invalidate when any of MY orders change
@@ -65,13 +71,23 @@ function OrdersPage() {
               <p className="text-[11px] text-muted-foreground">Mise à jour en temps réel</p>
             </div>
           </div>
-          <button
-            onClick={() => refetch()}
-            className="flex items-center gap-1.5 rounded-full bg-white/70 px-3 py-1.5 text-xs font-medium hover:bg-white"
-          >
-            <RefreshCw className={`h-3.5 w-3.5 ${isFetching ? "animate-spin" : ""}`} />
-            Actualiser
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => syncMutation.mutate()}
+              disabled={syncMutation.isPending}
+              className="flex items-center gap-1.5 rounded-full bg-white/70 px-3 py-1.5 text-xs font-medium hover:bg-white disabled:opacity-50"
+            >
+              <RefreshCw className={`h-3.5 w-3.5 ${syncMutation.isPending ? "animate-spin" : ""}`} />
+              Synchroniser
+            </button>
+            <button
+              onClick={() => refetch()}
+              className="flex items-center gap-1.5 rounded-full bg-white/70 px-3 py-1.5 text-xs font-medium hover:bg-white"
+            >
+              <RefreshCw className={`h-3.5 w-3.5 ${isFetching ? "animate-spin" : ""}`} />
+              Actualiser
+            </button>
+          </div>
         </div>
 
         {isLoading ? (
@@ -95,6 +111,11 @@ function OrdersPage() {
               const svc = o.service as { name?: string; platform?: string } | null;
               const pi = getPlatform(svc?.platform);
               const PIcon = pi.icon;
+              const pr = (o.provider_response ?? null) as { start_count?: string | number; remains?: string | number; status?: string } | null;
+              const startCount = pr?.start_count != null ? Number(pr.start_count) : null;
+              const remains = pr?.remains != null ? Number(pr.remains) : null;
+              const delivered = startCount != null && remains != null ? Math.max(0, o.quantity - remains) : null;
+              const pct = delivered != null ? Math.min(100, Math.round((delivered / o.quantity) * 100)) : null;
               return (
                 <li key={o.id} className="rounded-2xl glass-strong p-4">
                   <div className="flex items-start gap-3">
@@ -111,6 +132,20 @@ function OrdersPage() {
                         Code : <span className="font-mono font-semibold">{o.public_code}</span>
                         {o.provider_order_id && <> · Réf. : <span className="font-mono">{o.provider_order_id}</span></>}
                       </p>
+                      {pct != null && (
+                        <div className="mt-2">
+                          <div className="flex items-center justify-between text-[10px] text-muted-foreground">
+                            <span>Livrés : {formatNumber(delivered!)} / {formatNumber(o.quantity)}</span>
+                            <span>{pct}%</span>
+                          </div>
+                          <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-white/60">
+                            <div className="h-full bg-gradient-to-r from-primary to-sky-500" style={{ width: `${pct}%` }} />
+                          </div>
+                          {startCount != null && (
+                            <p className="mt-0.5 text-[10px] text-muted-foreground">Compteur de départ : {formatNumber(startCount)}</p>
+                          )}
+                        </div>
+                      )}
                     </div>
                     <div className="text-right">
                       <p className="text-sm font-bold">{formatPrice(o.amount_ton, currency, rates)}</p>

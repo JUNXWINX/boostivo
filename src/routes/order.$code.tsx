@@ -158,8 +158,9 @@ function OrderPage() {
         )}
 
         {(order.status === "sent" || order.status === "completed") && order.provider_order_id && (
-          <div className="rounded-2xl border border-emerald-300 bg-emerald-50 p-4 text-sm">
-            ID fournisseur: <span className="font-mono text-emerald-700">{order.provider_order_id}</span>
+          <div className="rounded-2xl border border-emerald-300 bg-emerald-50 p-4 text-sm space-y-2">
+            <div>ID fournisseur: <span className="font-mono text-emerald-700">{order.provider_order_id}</span></div>
+            <ProviderProgress order={order} />
           </div>
         )}
       </div>
@@ -175,6 +176,32 @@ function Field({ label, value, highlight, mono }: { label: string; value: string
         <span className={`flex-1 break-all text-sm ${mono ? "font-mono" : ""}`}>{value}</span>
         <CopyButton value={value} />
       </div>
+    </div>
+  );
+}
+
+function ProviderProgress({ order }: { order: { quantity: number; provider_response?: unknown } }) {
+  const pr = (order.provider_response ?? null) as { start_count?: string | number; remains?: string | number; status?: string; charge?: string; currency?: string } | null;
+  if (!pr) return <p className="text-xs text-emerald-800/80">Statut fournisseur en attente…</p>;
+  const startCount = pr.start_count != null ? Number(pr.start_count) : null;
+  const remains = pr.remains != null ? Number(pr.remains) : null;
+  const delivered = remains != null ? Math.max(0, order.quantity - remains) : null;
+  const pct = delivered != null ? Math.min(100, Math.round((delivered / order.quantity) * 100)) : null;
+  return (
+    <div className="space-y-1.5">
+      {pr.status && <p className="text-xs">Statut fournisseur : <strong>{pr.status}</strong></p>}
+      {startCount != null && <p className="text-xs">Compteur de départ : {formatNumber(startCount)}</p>}
+      {pct != null && (
+        <>
+          <div className="flex items-center justify-between text-xs">
+            <span>Livrés : {formatNumber(delivered!)} / {formatNumber(order.quantity)}</span>
+            <span>{pct}%</span>
+          </div>
+          <div className="h-2 w-full overflow-hidden rounded-full bg-emerald-200">
+            <div className="h-full bg-emerald-600" style={{ width: `${pct}%` }} />
+          </div>
+        </>
+      )}
     </div>
   );
 }
