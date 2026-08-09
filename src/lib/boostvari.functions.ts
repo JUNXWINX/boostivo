@@ -77,7 +77,7 @@ export const getMyProfile = createServerFn({ method: "GET" })
 export const updateMyCurrency = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: { currency: string }) =>
-    z.object({ currency: z.enum(["XOF", "USD", "USDT", "TON"]) }).parse(d),
+    z.object({ currency: z.enum(["XOF", "USD"]) }).parse(d),
   )
   .handler(async ({ context, data }) => {
     const { error } = await context.supabase
@@ -216,12 +216,15 @@ export const createOrder = createServerFn({ method: "POST" })
       throw new Error(error.message);
     }
 
-    // push to provider if paid by balance — await so status reflects the outcome
-    // (fire-and-forget doesn't survive on serverless workers)
+    // Provider dispatch: only when auto-send is enabled (default = manual mode)
     if (usedBalance) {
       try {
-        const { pushToProvider } = await import("./processing.server");
-        await pushToProvider(inserted.id);
+        const { data: setting } = await supabaseAdmin
+          .from("settings").select("value").eq("key", "auto_send_orders").maybeSingle();
+        if (String(setting?.value ?? "false") === "true") {
+          const { pushToProvider } = await import("./processing.server");
+          await pushToProvider(inserted.id);
+        }
       } catch (e) {
         console.error("[order] push failed", e);
       }
@@ -321,17 +324,21 @@ export const adminSyncServices = createServerFn({ method: "POST" })
 
     const { data: settings } = await supabaseAdmin.from("settings").select("key, value");
     const settingsMap = new Map((settings ?? []).map((s) => [s.key, s.value]));
-    const markup = Number(settingsMap.get("markup_percent") ?? "110") / 100; // 110% => ×2.1
     const tonUsd = Number(settingsMap.get("usd_per_ton") ?? settingsMap.get("ton_price_usd") ?? "2.3");
+
+    const { loadMargins, resolveMargin, guessKind, roundTon } = await import("./margins.server");
+    const margins = await loadMargins();
 
     const services = await fetchServices();
     let upserted = 0;
     for (const s of services) {
       const name = s.name || "Service";
-      const platform = guessPlatform(name + " " + (s.category ?? ""));
+      const label = name + " " + (s.category ?? "");
+      const platform = guessPlatform(label);
+      const kind = guessKind(label);
       const rateUsd = Number(s.rate);
       if (!isFinite(rateUsd) || rateUsd <= 0) continue;
-      const ratePerKTon = (rateUsd / tonUsd) * (1 + markup);
+      const ratePerKTon = roundTon((rateUsd / tonUsd) * resolveMargin(margins, platform, kind));
       const remarksParts: string[] = [];
       if (s.description) remarksParts.push(String(s.description));
       const flags: string[] = [];
@@ -347,7 +354,7 @@ export const adminSyncServices = createServerFn({ method: "POST" })
           provider_id: String(s.service),
           name, category: s.category ?? null, type: s.type ?? null, platform,
           rate_per_1k: rateUsd,
-          rate_per_1k_ton: Number(ratePerKTon.toFixed(6)),
+          rate_per_1k_ton: ratePerKTon,
           min_qty: Number(s.min) || 1, max_qty: Number(s.max) || 1_000_000,
           avg_time: avgTime,
           remarks,
