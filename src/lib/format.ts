@@ -8,7 +8,7 @@ export function formatNumber(n: number | string | null | undefined, decimals?: n
   return (num < 0 ? "-" : "") + (dec ? `${withSep},${dec}` : withSep);
 }
 
-export type Currency = "XOF" | "USD" | "USDT" | "TON";
+export type Currency = "XOF" | "USD";
 
 // Fallback default rates (real values come from settings + live refresh)
 export const XOF_PER_TON = 1400;
