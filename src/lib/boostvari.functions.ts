@@ -77,7 +77,7 @@ export const getMyProfile = createServerFn({ method: "GET" })
 export const updateMyCurrency = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: { currency: string }) =>
-    z.object({ currency: z.enum(["XOF", "USD", "USDT", "TON"]) }).parse(d),
+    z.object({ currency: z.enum(["XOF", "USD"]) }).parse(d),
   )
   .handler(async ({ context, data }) => {
     const { error } = await context.supabase
@@ -216,12 +216,15 @@ export const createOrder = createServerFn({ method: "POST" })
       throw new Error(error.message);
     }
 
-    // push to provider if paid by balance — await so status reflects the outcome
-    // (fire-and-forget doesn't survive on serverless workers)
+    // Provider dispatch: only when auto-send is enabled (default = manual mode)
     if (usedBalance) {
       try {
-        const { pushToProvider } = await import("./processing.server");
-        await pushToProvider(inserted.id);
+        const { data: setting } = await supabaseAdmin
+          .from("settings").select("value").eq("key", "auto_send_orders").maybeSingle();
+        if (String(setting?.value ?? "false") === "true") {
+          const { pushToProvider } = await import("./processing.server");
+          await pushToProvider(inserted.id);
+        }
       } catch (e) {
         console.error("[order] push failed", e);
       }
@@ -321,17 +324,21 @@ export const adminSyncServices = createServerFn({ method: "POST" })
 
     const { data: settings } = await supabaseAdmin.from("settings").select("key, value");
     const settingsMap = new Map((settings ?? []).map((s) => [s.key, s.value]));
-    const markup = Number(settingsMap.get("markup_percent") ?? "110") / 100; // 110% => ×2.1
     const tonUsd = Number(settingsMap.get("usd_per_ton") ?? settingsMap.get("ton_price_usd") ?? "2.3");
+
+    const { loadMargins, resolveMargin, guessKind, roundTon } = await import("./margins.server");
+    const margins = await loadMargins();
 
     const services = await fetchServices();
     let upserted = 0;
     for (const s of services) {
       const name = s.name || "Service";
-      const platform = guessPlatform(name + " " + (s.category ?? ""));
+      const label = name + " " + (s.category ?? "");
+      const platform = guessPlatform(label);
+      const kind = guessKind(label);
       const rateUsd = Number(s.rate);
       if (!isFinite(rateUsd) || rateUsd <= 0) continue;
-      const ratePerKTon = (rateUsd / tonUsd) * (1 + markup);
+      const ratePerKTon = roundTon((rateUsd / tonUsd) * resolveMargin(margins, platform, kind));
       const remarksParts: string[] = [];
       if (s.description) remarksParts.push(String(s.description));
       const flags: string[] = [];
@@ -347,7 +354,7 @@ export const adminSyncServices = createServerFn({ method: "POST" })
           provider_id: String(s.service),
           name, category: s.category ?? null, type: s.type ?? null, platform,
           rate_per_1k: rateUsd,
-          rate_per_1k_ton: Number(ratePerKTon.toFixed(6)),
+          rate_per_1k_ton: ratePerKTon,
           min_qty: Number(s.min) || 1, max_qty: Number(s.max) || 1_000_000,
           avg_time: avgTime,
           remarks,
@@ -403,3 +410,230 @@ function guessPlatform(text: string): string {
   if (t.includes("soundcloud")) return "SoundCloud";
   return "Autre";
 }
+
+// ============ Marges (admin) ============
+export const adminListMargins = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    await assertAdmin(context);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data, error } = await supabaseAdmin
+      .from("margins").select("id, platform, kind, percent")
+      .order("platform").order("kind");
+    if (error) throw new Error(error.message);
+    return (data ?? []).map((m) => ({ ...m, percent: Number(m.percent) }));
+  });
+
+export const adminSaveMargin = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) =>
+    z.object({
+      platform: z.string().min(1).max(40),
+      kind: z.enum(["subscribers", "members", "likes", "views", "other", "all"]),
+      percent: z.number().min(0).max(10000),
+    }).parse(d),
+  )
+  .handler(async ({ context, data }) => {
+    await assertAdmin(context);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { error } = await supabaseAdmin
+      .from("margins")
+      .upsert({ platform: data.platform, kind: data.kind, percent: data.percent }, { onConflict: "platform,kind" });
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
+/** Recompute every service price from its provider cost + current margins. */
+export const adminRecalcPrices = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    await assertAdmin(context);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { loadMargins, resolveMargin, guessKind, roundTon } = await import("./margins.server");
+    const { data: setting } = await supabaseAdmin
+      .from("settings").select("value").eq("key", "usd_per_ton").maybeSingle();
+    const tonUsd = Number(setting?.value ?? "2.3") || 2.3;
+    const margins = await loadMargins();
+    const { data: services } = await supabaseAdmin
+      .from("services").select("id, name, category, platform, rate_per_1k");
+    let updated = 0;
+    for (const s of services ?? []) {
+      const cost = Number(s.rate_per_1k);
+      if (!isFinite(cost) || cost <= 0) continue;
+      const kind = guessKind(`${s.name} ${s.category ?? ""}`);
+      const ton = roundTon((cost / tonUsd) * resolveMargin(margins, s.platform ?? "Autre", kind));
+      const { error } = await supabaseAdmin
+        .from("services").update({ rate_per_1k_ton: ton, updated_at: new Date().toISOString() }).eq("id", s.id);
+      if (!error) updated++;
+    }
+    return { updated, total: services?.length ?? 0 };
+  });
+
+// ============ Mobile Money ============
+export type MomoAccount = { country: string; operator: string; number: string; name: string };
+
+const DEFAULT_MOMO: MomoAccount[] = [
+  { country: "Bénin", operator: "MTN MoMo", number: "+229 00 00 00 00", name: "Boostivo" },
+  { country: "Bénin", operator: "Moov Money", number: "+229 00 00 00 00", name: "Boostivo" },
+  { country: "Côte d'Ivoire", operator: "Orange Money", number: "+225 00 00 00 00", name: "Boostivo" },
+  { country: "Côte d'Ivoire", operator: "Wave", number: "+225 00 00 00 00", name: "Boostivo" },
+  { country: "Togo", operator: "T-Money", number: "+228 00 00 00 00", name: "Boostivo" },
+  { country: "Sénégal", operator: "Wave", number: "+221 00 00 00 00", name: "Boostivo" },
+  { country: "Burkina Faso", operator: "Orange Money", number: "+226 00 00 00 00", name: "Boostivo" },
+  { country: "Mali", operator: "Orange Money", number: "+223 00 00 00 00", name: "Boostivo" },
+];
+
+async function readMomoAccounts(): Promise<MomoAccount[]> {
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const { data } = await supabaseAdmin.from("settings").select("value").eq("key", "momo_accounts").maybeSingle();
+  if (!data?.value) return DEFAULT_MOMO;
+  try {
+    const parsed = JSON.parse(data.value);
+    return Array.isArray(parsed) && parsed.length ? (parsed as MomoAccount[]) : DEFAULT_MOMO;
+  } catch {
+    return DEFAULT_MOMO;
+  }
+}
+
+export const getMomoAccounts = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async () => readMomoAccounts());
+
+export const adminSaveMomoAccounts = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) =>
+    z.object({
+      accounts: z.array(z.object({
+        country: z.string().min(1).max(60),
+        operator: z.string().min(1).max(60),
+        number: z.string().min(4).max(40),
+        name: z.string().min(1).max(60),
+      })).max(50),
+    }).parse(d),
+  )
+  .handler(async ({ context, data }) => {
+    await assertAdmin(context);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { error } = await supabaseAdmin
+      .from("settings").upsert({ key: "momo_accounts", value: JSON.stringify(data.accounts) }, { onConflict: "key" });
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
+export const createTopupRequest = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) =>
+    z.object({
+      country: z.string().min(1).max(60),
+      operator: z.string().min(1).max(60),
+      phone: z.string().trim().min(6).max(25),
+      amount_xof: z.number().int().min(500).max(5_000_000),
+    }).parse(d),
+  )
+  .handler(async ({ context, data }) => {
+    const { error } = await context.supabase.from("topup_requests").insert({
+      user_id: context.userId,
+      country: data.country,
+      operator: data.operator,
+      phone: data.phone,
+      amount_xof: data.amount_xof,
+      status: "pending",
+    });
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
+export const getMyTopups = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { data, error } = await context.supabase
+      .from("topup_requests")
+      .select("id, country, operator, phone, amount_xof, status, admin_note, created_at, processed_at")
+      .eq("user_id", context.userId)
+      .order("created_at", { ascending: false })
+      .limit(30);
+    if (error) throw new Error(error.message);
+    return (data ?? []).map((t) => ({ ...t, amount_xof: Number(t.amount_xof) }));
+  });
+
+export const adminListTopups = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    await assertAdmin(context);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data, error } = await supabaseAdmin
+      .from("topup_requests")
+      .select("id, user_id, country, operator, phone, amount_xof, status, admin_note, created_at")
+      .order("created_at", { ascending: false })
+      .limit(100);
+    if (error) throw new Error(error.message);
+    const ids = [...new Set((data ?? []).map((t) => t.user_id))];
+    const { data: profiles } = ids.length
+      ? await supabaseAdmin.from("profiles").select("user_id, username").in("user_id", ids)
+      : { data: [] as { user_id: string; username: string }[] };
+    const nameMap = new Map((profiles ?? []).map((p) => [p.user_id, p.username]));
+    return (data ?? []).map((t) => ({
+      ...t,
+      amount_xof: Number(t.amount_xof),
+      username: nameMap.get(t.user_id) ?? "—",
+    }));
+  });
+
+export const adminReviewTopup = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) =>
+    z.object({
+      id: z.string().uuid(),
+      approve: z.boolean(),
+      note: z.string().max(300).optional(),
+    }).parse(d),
+  )
+  .handler(async ({ context, data }) => {
+    await assertAdmin(context);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: row, error } = await supabaseAdmin
+      .from("topup_requests").select("id, user_id, amount_xof, status").eq("id", data.id).maybeSingle();
+    if (error) throw new Error(error.message);
+    if (!row) throw new Error("Demande introuvable");
+    if (row.status !== "pending") throw new Error("Demande déjà traitée");
+
+    if (data.approve) {
+      const { data: setting } = await supabaseAdmin
+        .from("settings").select("value").eq("key", "xof_per_ton").maybeSingle();
+      const xofPerTon = Number(setting?.value ?? "3300") || 3300;
+      const amountTon = Math.round((Number(row.amount_xof) / xofPerTon) * 1e6) / 1e6;
+      const { error: credErr } = await supabaseAdmin.rpc("credit_balance", { _user: row.user_id, _amount: amountTon });
+      if (credErr) throw new Error(credErr.message);
+    }
+
+    const { error: updErr } = await supabaseAdmin.from("topup_requests").update({
+      status: data.approve ? "approved" : "rejected",
+      admin_note: data.note ?? null,
+      processed_at: new Date().toISOString(),
+    }).eq("id", data.id).eq("status", "pending");
+    if (updErr) throw new Error(updErr.message);
+    return { ok: true };
+  });
+
+// ============ Mode d'envoi fournisseur ============
+export const adminGetAutoSend = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    await assertAdmin(context);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data } = await supabaseAdmin
+      .from("settings").select("value").eq("key", "auto_send_orders").maybeSingle();
+    return { auto: String(data?.value ?? "false") === "true" };
+  });
+
+export const adminSetAutoSend = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) => z.object({ auto: z.boolean() }).parse(d))
+  .handler(async ({ context, data }) => {
+    await assertAdmin(context);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { error } = await supabaseAdmin
+      .from("settings").upsert({ key: "auto_send_orders", value: data.auto ? "true" : "false" }, { onConflict: "key" });
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });

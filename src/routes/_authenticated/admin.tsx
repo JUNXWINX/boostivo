@@ -3,6 +3,8 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { Loader2, RefreshCw, Send, LogOut } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
+import { MarginsPanel } from "@/components/admin/MarginsPanel";
+import { TopupsPanel } from "@/components/admin/TopupsPanel";
 import {
   adminListOrders,
   adminStats,
@@ -106,6 +108,9 @@ function AdminPage() {
           Scan TON: {tonScan.data.scanned} txs · {tonScan.data.orderMatches} commandes · {tonScan.data.depositCredits} dépôts · {tonScan.data.pushed} envoyées
         </div>
       )}
+
+      <TopupsPanel />
+      <MarginsPanel />
 
       <h2 className="mt-6 mb-2 text-sm font-semibold uppercase tracking-wider text-muted-foreground">Commandes récentes</h2>
       {orders.isLoading ? (

@@ -24,12 +24,8 @@ export function CurrencyProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     try {
       const stored = localStorage.getItem(STORAGE_KEY);
-      if (stored === "XOF" || stored === "USD" || stored === "USDT" || stored === "TON") setCurrencyState(stored);
-      else {
-        // migrate old key
-        const old = localStorage.getItem("boostvari:currency");
-        if (old === "XOF" || old === "USD" || old === "USDT" || old === "TON") setCurrencyState(old);
-      }
+      if (stored === "XOF" || stored === "USD") setCurrencyState(stored);
+      else if (stored) setCurrencyState("XOF");
     } catch { /* noop */ }
   }, []);
 

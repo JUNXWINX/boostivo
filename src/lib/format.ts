@@ -8,7 +8,7 @@ export function formatNumber(n: number | string | null | undefined, decimals?: n
   return (num < 0 ? "-" : "") + (dec ? `${withSep},${dec}` : withSep);
 }
 
-export type Currency = "XOF" | "USD" | "USDT" | "TON";
+export type Currency = "XOF" | "USD";
 
 // Fallback default rates (real values come from settings + live refresh)
 export const XOF_PER_TON = 1400;
@@ -43,16 +43,14 @@ export function formatUsdt(ton: number | string | null | undefined, rate = USDT_
   return `${formatNumber(tonToUsd(n, rate), 2)} USDT`;
 }
 
-/** Format a TON amount in the chosen display currency. */
+/** Format a TON amount in the chosen display currency (FCFA or USD). */
 export function formatPrice(
   ton: number,
   currency: Currency,
   rates?: { xof?: number; usd?: number; usdt?: number },
 ): string {
   if (!isFinite(ton)) ton = 0;
-  if (currency === "TON") return formatTon(ton);
   if (currency === "USD") return formatUsd(ton, rates?.usd ?? USD_PER_TON);
-  if (currency === "USDT") return formatUsdt(ton, rates?.usdt ?? USDT_PER_TON);
   return formatXof(ton, rates?.xof ?? XOF_PER_TON);
 }
 
