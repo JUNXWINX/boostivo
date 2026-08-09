@@ -614,3 +614,26 @@ export const adminReviewTopup = createServerFn({ method: "POST" })
     if (updErr) throw new Error(updErr.message);
     return { ok: true };
   });
+
+// ============ Mode d'envoi fournisseur ============
+export const adminGetAutoSend = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    await assertAdmin(context);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data } = await supabaseAdmin
+      .from("settings").select("value").eq("key", "auto_send_orders").maybeSingle();
+    return { auto: String(data?.value ?? "false") === "true" };
+  });
+
+export const adminSetAutoSend = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) => z.object({ auto: z.boolean() }).parse(d))
+  .handler(async ({ context, data }) => {
+    await assertAdmin(context);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { error } = await supabaseAdmin
+      .from("settings").upsert({ key: "auto_send_orders", value: data.auto ? "true" : "false" }, { onConflict: "key" });
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
