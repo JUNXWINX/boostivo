@@ -14,6 +14,13 @@ export function mapProviderStatus(raw?: string): "sent" | "completed" | "failed"
   return "sent";
 }
 
+/** Manual mode by default: orders are only pushed to the provider when enabled. */
+export async function autoSendEnabled(): Promise<boolean> {
+  const { data } = await supabaseAdmin
+    .from("settings").select("value").eq("key", "auto_send_orders").maybeSingle();
+  return String(data?.value ?? "false") === "true";
+}
+
 export async function syncOrderStatus(orderId: string): Promise<{ ok: boolean; status?: string; provider?: ProviderStatus; error?: string }> {
   const { data: order, error } = await supabaseAdmin
     .from("orders").select("id, provider_order_id, status")
