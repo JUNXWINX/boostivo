@@ -5,6 +5,7 @@ import { QRCodeSVG } from "qrcode.react";
 import { AlertTriangle, ArrowDownToLine, Check, Copy, Loader2, RefreshCw, LogOut } from "lucide-react";
 import { useEffect, useState } from "react";
 import { AppShell } from "@/components/AppShell";
+import { MobileMoneyTopup } from "@/components/MobileMoneyTopup";
 import { getMyProfile, getMyDeposits, triggerTonCheck } from "@/lib/boostvari.functions";
 import { useCurrency } from "@/lib/currency";
 import { formatPrice, formatTon } from "@/lib/format";

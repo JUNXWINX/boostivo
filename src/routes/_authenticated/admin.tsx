@@ -3,6 +3,8 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { Loader2, RefreshCw, Send, LogOut } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
+import { MarginsPanel } from "@/components/admin/MarginsPanel";
+import { TopupsPanel } from "@/components/admin/TopupsPanel";
 import {
   adminListOrders,
   adminStats,
