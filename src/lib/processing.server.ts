@@ -151,8 +151,10 @@ export async function runTonCheck(): Promise<{ scanned: number; orderMatches: nu
       if (!upd) {
         matchedOrderId = order.id;
         orderMatches++;
-        const res = await pushToProvider(order.id);
-        if (res.ok) pushed++;
+        if (await autoSendEnabled()) {
+          const res = await pushToProvider(order.id);
+          if (res.ok) pushed++;
+        }
       }
     } else {
       // 2) Try to match a user deposit memo
