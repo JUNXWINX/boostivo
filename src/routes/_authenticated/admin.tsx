@@ -109,6 +109,9 @@ function AdminPage() {
         </div>
       )}
 
+      <TopupsPanel />
+      <MarginsPanel />
+
       <h2 className="mt-6 mb-2 text-sm font-semibold uppercase tracking-wider text-muted-foreground">Commandes récentes</h2>
       {orders.isLoading ? (
         <div className="rounded-xl border border-border/60 bg-card p-6 text-center text-sm text-muted-foreground">Chargement…</div>

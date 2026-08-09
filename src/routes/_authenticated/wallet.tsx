@@ -101,6 +101,8 @@ function WalletPage() {
           </div>
         </div>
 
+        <MobileMoneyTopup />
+
         {/* Deposit section */}
         <div className="overflow-hidden rounded-3xl glass-strong">
           <div className="flex items-center gap-2 border-b border-white/60 p-4">
