@@ -50,6 +50,33 @@ export type Database = {
         }
         Relationships: []
       }
+      margins: {
+        Row: {
+          created_at: string
+          id: string
+          kind: string
+          percent: number
+          platform: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          kind?: string
+          percent?: number
+          platform: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          kind?: string
+          percent?: number
+          platform?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       orders: {
         Row: {
           amount_ton: number
@@ -254,6 +281,48 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      topup_requests: {
+        Row: {
+          admin_note: string | null
+          amount_xof: number
+          country: string
+          created_at: string
+          id: string
+          operator: string
+          phone: string
+          processed_at: string | null
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          admin_note?: string | null
+          amount_xof: number
+          country: string
+          created_at?: string
+          id?: string
+          operator: string
+          phone: string
+          processed_at?: string | null
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          admin_note?: string | null
+          amount_xof?: number
+          country?: string
+          created_at?: string
+          id?: string
+          operator?: string
+          phone?: string
+          processed_at?: string | null
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
       }
       user_roles: {
         Row: {
