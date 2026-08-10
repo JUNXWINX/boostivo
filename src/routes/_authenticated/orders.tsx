@@ -41,13 +41,13 @@ function OrdersPage() {
 
   // Realtime: invalidate when any of MY orders change
   useEffect(() => {
-    let userId: string | null = null;
     let channel: ReturnType<typeof supabase.channel> | null = null;
+    let cancelled = false;
     supabase.auth.getUser().then(({ data }) => {
-      userId = data.user?.id ?? null;
-      if (!userId) return;
+      const userId = data.user?.id;
+      if (!userId || cancelled) return;
       channel = supabase
-        .channel("orders-mine")
+        .channel(`orders-mine-${userId}-${Math.random().toString(36).slice(2)}`)
         .on(
           "postgres_changes",
           { event: "*", schema: "public", table: "orders", filter: `user_id=eq.${userId}` },
@@ -55,7 +55,7 @@ function OrdersPage() {
         )
         .subscribe();
     });
-    return () => { if (channel) supabase.removeChannel(channel); };
+    return () => { cancelled = true; if (channel) supabase.removeChannel(channel); };
   }, [qc]);
 
   return (
@@ -176,7 +176,7 @@ function StatusBadge({ status }: { status: string }) {
   const label =
     status === "completed" ? "Terminée"
     : status === "sent" ? "En cours"
-    : status === "paid" ? "Payée"
+    : status === "paid" ? "Payée · en file d'envoi"
     : status === "pending" ? "En attente paiement"
     : status === "failed" ? "Échec" : status;
   return <span className={`mt-1 inline-block rounded-full px-2 py-0.5 text-[10px] font-medium ${cls}`}>{label}</span>;

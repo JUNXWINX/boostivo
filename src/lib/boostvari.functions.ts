@@ -107,7 +107,8 @@ export const getMyOrders = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
     try {
-      const { syncUserOpenOrders } = await import("./processing.server");
+      const { syncUserOpenOrders, dispatchPendingOrders } = await import("./processing.server");
+      await dispatchPendingOrders(5, context.userId);
       await syncUserOpenOrders(context.userId);
     } catch (e) {
       console.error("[getMyOrders] sync failed", e);
@@ -125,7 +126,8 @@ export const getMyOrders = createServerFn({ method: "GET" })
 export const syncMyOrders = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
-    const { syncUserOpenOrders } = await import("./processing.server");
+    const { syncUserOpenOrders, dispatchPendingOrders } = await import("./processing.server");
+    await dispatchPendingOrders(10, context.userId);
     return syncUserOpenOrders(context.userId);
   });
 
@@ -216,14 +218,13 @@ export const createOrder = createServerFn({ method: "POST" })
       throw new Error(error.message);
     }
 
-    // Provider dispatch: only when auto-send is enabled (default = manual mode)
+    // Provider dispatch: automatic by default; failures stay queued and are retried
+    let dispatch: { ok: boolean; status: string; error?: string; retryable?: boolean } | null = null;
     if (usedBalance) {
       try {
-        const { data: setting } = await supabaseAdmin
-          .from("settings").select("value").eq("key", "auto_send_orders").maybeSingle();
-        if (String(setting?.value ?? "false") === "true") {
-          const { pushToProvider } = await import("./processing.server");
-          await pushToProvider(inserted.id);
+        const { pushToProvider, autoSendEnabled } = await import("./processing.server");
+        if (await autoSendEnabled()) {
+          dispatch = await pushToProvider(inserted.id);
         }
       } catch (e) {
         console.error("[order] push failed", e);
@@ -231,13 +232,16 @@ export const createOrder = createServerFn({ method: "POST" })
     }
 
 
+
     return {
       id: inserted.id,
       public_code: inserted.public_code,
       memo: inserted.memo,
       amount_ton: Number(inserted.amount_ton),
-      status: inserted.status,
+      status: dispatch?.ok ? "sent" : inserted.status,
       paid_with_balance: usedBalance,
+      dispatched: dispatch?.ok ?? false,
+      queued: dispatch ? !dispatch.ok && dispatch.retryable !== false : false,
       ton_address: process.env.TON_RECEIVE_ADDRESS || "",
     };
   });
@@ -305,15 +309,98 @@ export const adminStats = createServerFn({ method: "GET" })
   .handler(async ({ context }) => {
     await assertAdmin(context);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { data } = await supabaseAdmin.from("orders").select("status, amount_ton, created_at");
-    const rows = data ?? [];
-    const total = rows.length;
-    const paidPlus = rows.filter((r) => ["paid", "sent", "completed"].includes(r.status as string));
+
+    const [{ data: orderRows }, { data: depRows }, { data: topRows }, { data: profRows }] = await Promise.all([
+      supabaseAdmin.from("orders").select("status, amount_ton, created_at, quantity, service:services(platform, rate_per_1k)"),
+      supabaseAdmin.from("deposits").select("amount_ton, created_at"),
+      supabaseAdmin.from("topup_requests").select("amount_xof, status, created_at"),
+      supabaseAdmin.from("profiles").select("user_id, balance_ton, created_at"),
+    ]);
+
+    const rows = orderRows ?? [];
+    const paidPlus = rows.filter((r) => ["paid", "sent", "completed"].includes(String(r.status)));
     const revenue = paidPlus.reduce((s, r) => s + Number(r.amount_ton), 0);
-    const pending = rows.filter((r) => r.status === "pending").length;
-    const sent = rows.filter((r) => r.status === "sent" || r.status === "completed").length;
-    return { total, revenue, pending, sent, paid: paidPlus.length };
+    const cost = paidPlus.reduce((s, r) => {
+      const svc = r.service as { rate_per_1k?: number } | null;
+      return s + ((Number(svc?.rate_per_1k ?? 0) * Number(r.quantity)) / 1000);
+    }, 0); // in USD
+
+    const byStatus = ["pending", "paid", "sent", "completed", "failed", "cancelled"].map((s) => ({
+      status: s,
+      count: rows.filter((r) => r.status === s).length,
+    }));
+
+    const platformMap = new Map<string, { platform: string; orders: number; revenue: number }>();
+    for (const r of paidPlus) {
+      const p = (r.service as { platform?: string } | null)?.platform ?? "Autre";
+      const cur = platformMap.get(p) ?? { platform: p, orders: 0, revenue: 0 };
+      cur.orders += 1;
+      cur.revenue += Number(r.amount_ton);
+      platformMap.set(p, cur);
+    }
+    const byPlatform = [...platformMap.values()].sort((a, b) => b.revenue - a.revenue).slice(0, 8);
+
+    // 30-day daily series
+    const days: { day: string; orders: number; revenue: number; deposits: number }[] = [];
+    const dayKey = (d: Date) => d.toISOString().slice(0, 10);
+    const idx = new Map<string, number>();
+    for (let i = 29; i >= 0; i--) {
+      const d = new Date(Date.now() - i * 86400000);
+      idx.set(dayKey(d), days.length);
+      days.push({ day: dayKey(d).slice(5), orders: 0, revenue: 0, deposits: 0 });
+    }
+    for (const r of rows) {
+      const k = idx.get(String(r.created_at).slice(0, 10));
+      if (k == null) continue;
+      days[k].orders += 1;
+      if (["paid", "sent", "completed"].includes(String(r.status))) days[k].revenue += Number(r.amount_ton);
+    }
+    for (const d of depRows ?? []) {
+      const k = idx.get(String(d.created_at).slice(0, 10));
+      if (k != null) days[k].deposits += Number(d.amount_ton);
+    }
+
+    // provider balance (best effort)
+    let providerBalance: { balance?: string; currency?: string; error?: string } = {};
+    try {
+      const { fetchBalance } = await import("./exobooster.server");
+      providerBalance = await fetchBalance();
+    } catch (e) {
+      providerBalance = { error: e instanceof Error ? e.message : "indisponible" };
+    }
+
+    const topups = topRows ?? [];
+    return {
+      total: rows.length,
+      revenue,
+      costUsd: cost,
+      pending: rows.filter((r) => r.status === "pending").length,
+      paid: paidPlus.length,
+      queued: rows.filter((r) => r.status === "paid").length,
+      sent: rows.filter((r) => r.status === "sent").length,
+      completed: rows.filter((r) => r.status === "completed").length,
+      failed: rows.filter((r) => r.status === "failed").length,
+      users: (profRows ?? []).length,
+      userBalance: (profRows ?? []).reduce((s, p) => s + Number(p.balance_ton), 0),
+      depositsTon: (depRows ?? []).reduce((s, d) => s + Number(d.amount_ton), 0),
+      topupsPending: topups.filter((t) => t.status === "pending").length,
+      topupsApprovedXof: topups.filter((t) => t.status === "approved").reduce((s, t) => s + Number(t.amount_xof), 0),
+      byStatus,
+      byPlatform,
+      days,
+      providerBalance,
+    };
   });
+
+/** Force a dispatch pass over every queued (paid) order. */
+export const adminDispatchPending = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    await assertAdmin(context);
+    const { dispatchPendingOrders } = await import("./processing.server");
+    return dispatchPendingOrders(50);
+  });
+
 
 export const adminSyncServices = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -623,7 +710,7 @@ export const adminGetAutoSend = createServerFn({ method: "GET" })
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data } = await supabaseAdmin
       .from("settings").select("value").eq("key", "auto_send_orders").maybeSingle();
-    return { auto: String(data?.value ?? "false") === "true" };
+    return { auto: data?.value == null ? true : String(data.value) !== "false" };
   });
 
 export const adminSetAutoSend = createServerFn({ method: "POST" })

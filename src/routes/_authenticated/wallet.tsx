@@ -2,22 +2,22 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { QRCodeSVG } from "qrcode.react";
-import { AlertTriangle, ArrowDownToLine, Check, Copy, Loader2, RefreshCw, LogOut } from "lucide-react";
+import { AlertTriangle, ArrowDownToLine, Check, Copy, Loader2, RefreshCw, LogOut, Plus, Smartphone, Coins, ChevronLeft, Wallet } from "lucide-react";
 import { useEffect, useState } from "react";
 import { AppShell } from "@/components/AppShell";
 import { MobileMoneyTopup } from "@/components/MobileMoneyTopup";
 import { getMyProfile, getMyDeposits, triggerTonCheck } from "@/lib/boostvari.functions";
 import { useCurrency } from "@/lib/currency";
-import { formatPrice, formatTon } from "@/lib/format";
+import { formatPrice } from "@/lib/format";
 import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/_authenticated/wallet")({
   head: () => ({
     meta: [
       { title: "Portefeuille TON — Boostivo" },
-      { name: "description", content: "Gérez votre solde TON Boostivo : rechargez votre portefeuille avec un memo unique et suivez l'historique de vos dépôts." },
+      { name: "description", content: "Gérez votre solde Boostivo : rechargez par Mobile Money ou en crypto TON et suivez l'historique de vos dépôts." },
       { property: "og:title", content: "Portefeuille TON — Boostivo" },
-      { property: "og:description", content: "Rechargez votre solde TON et suivez l'historique de vos dépôts." },
+      { property: "og:description", content: "Rechargez votre solde et suivez l'historique de vos dépôts." },
       { property: "og:url", content: "https://boostvari.lovable.app/wallet" },
       { name: "robots", content: "noindex" },
     ],
@@ -39,21 +39,24 @@ function CopyBtn({ value }: { value: string }) {
   );
 }
 
+type Mode = "home" | "choice" | "momo" | "ton";
+
 function WalletPage() {
   const qc = useQueryClient();
   const { currency, rates } = useCurrency();
+  const [mode, setMode] = useState<Mode>("home");
   const { data: profile, isLoading } = useQuery({ queryKey: ["my-profile"], queryFn: () => getMyProfile() });
   const { data: deposits = [] } = useQuery({ queryKey: ["my-deposits"], queryFn: () => getMyDeposits() });
 
   // Realtime: refresh balance + deposits when a new deposit lands
   useEffect(() => {
-    let uid: string | null = null;
     let channel: ReturnType<typeof supabase.channel> | null = null;
+    let cancelled = false;
     supabase.auth.getUser().then(({ data }) => {
-      uid = data.user?.id ?? null;
-      if (!uid) return;
+      const uid = data.user?.id;
+      if (!uid || cancelled) return;
       channel = supabase
-        .channel("deposits-mine")
+        .channel(`deposits-mine-${uid}-${Math.random().toString(36).slice(2)}`)
         .on("postgres_changes", { event: "*", schema: "public", table: "deposits", filter: `user_id=eq.${uid}` },
           () => {
             qc.invalidateQueries({ queryKey: ["my-deposits"] });
@@ -61,7 +64,7 @@ function WalletPage() {
           })
         .subscribe();
     });
-    return () => { if (channel) supabase.removeChannel(channel); };
+    return () => { cancelled = true; if (channel) supabase.removeChannel(channel); };
   }, [qc]);
 
   const tonCheckFn = useServerFn(triggerTonCheck);
@@ -81,81 +84,149 @@ function WalletPage() {
 
   return (
     <AppShell>
-      <h1 className="sr-only">Votre portefeuille TON Boostivo</h1>
+      <h1 className="sr-only">Votre portefeuille Boostivo</h1>
       <div className="space-y-4">
-        {/* Balance card */}
-        <div className="rounded-3xl glass-strong p-5">
+        {/* Big balance card */}
+        <div className="rounded-3xl bg-gradient-to-br from-primary to-sky-500 p-6 text-white shadow-lg">
           <div className="flex items-start justify-between gap-3">
             <div>
-              <p className="text-xs uppercase tracking-wider text-muted-foreground">Bonjour, @{profile.username}</p>
-              <p className="mt-1 text-xs text-muted-foreground">Solde disponible</p>
-              <p className="text-3xl font-bold text-emerald-600">{formatPrice(profile.balance_ton, currency, rates)}</p>
-              
+              <p className="text-xs uppercase tracking-wider text-white/80">Bonjour, @{profile.username}</p>
+              <p className="mt-3 flex items-center gap-1.5 text-xs text-white/80">
+                <Wallet className="h-3.5 w-3.5" /> Solde disponible
+              </p>
+              <p className="mt-0.5 text-4xl font-extrabold leading-tight">
+                {formatPrice(profile.balance_ton, currency, rates)}
+              </p>
             </div>
             <button
               onClick={async () => { await supabase.auth.signOut(); window.location.href = "/"; }}
-              className="flex items-center gap-1.5 rounded-full bg-white/70 px-3 py-1.5 text-[11px] text-muted-foreground hover:bg-white"
+              className="flex items-center gap-1.5 rounded-full bg-white/20 px-3 py-1.5 text-[11px] hover:bg-white/30"
             >
               <LogOut className="h-3.5 w-3.5" /> Déconnexion
             </button>
           </div>
-        </div>
 
-        <MobileMoneyTopup />
-
-        {/* Deposit section */}
-        <div className="overflow-hidden rounded-3xl glass-strong">
-          <div className="flex items-center gap-2 border-b border-white/60 p-4">
-            <span className="grid h-9 w-9 place-items-center rounded-xl bg-gradient-to-br from-emerald-500 to-green-600 text-white">
-              <ArrowDownToLine className="h-5 w-5" />
-            </span>
-            <h2 className="text-base font-bold">Recharger en TON</h2>
+          <div className="mt-5 grid grid-cols-2 gap-3 text-center text-[11px]">
+            <div className="rounded-2xl bg-white/15 p-3">
+              <p className="text-white/80">Dépôts confirmés</p>
+              <p className="mt-0.5 text-base font-bold">{deposits.length}</p>
+            </div>
+            <div className="rounded-2xl bg-white/15 p-3">
+              <p className="text-white/80">Total rechargé</p>
+              <p className="mt-0.5 text-base font-bold">
+                {formatPrice(deposits.reduce((s, d) => s + Number(d.amount_ton), 0), currency, rates)}
+              </p>
+            </div>
           </div>
 
-          <div className="space-y-4 p-5">
-            {/* Critical warning */}
-            <div className="rounded-2xl border-2 border-red-500 bg-red-50 p-4">
-              <div className="flex items-start gap-2">
-                <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-red-600" />
-                <div className="text-sm text-red-700">
-                  <p className="font-bold uppercase">⚠️ Important — À lire avant tout envoi</p>
-                  <p className="mt-1">
-                    Vous <strong>DEVEZ</strong> coller le <strong>MEMO ci-dessous</strong> dans le champ "memo / commentaire / tag"
-                    de votre wallet avant de confirmer la transaction.
-                  </p>
-                  <p className="mt-2 font-bold text-red-800">
-                    ❌ Sans memo (ou avec un memo incorrect), votre dépôt sera <u>PERDU DÉFINITIVEMENT</u> et irrécupérable.
-                  </p>
-                </div>
-              </div>
+          {mode === "home" && (
+            <button
+              onClick={() => setMode("choice")}
+              className="mt-5 flex w-full items-center justify-center gap-2 rounded-2xl bg-white px-4 py-3 text-sm font-bold text-primary shadow hover:bg-white/90"
+            >
+              <Plus className="h-4 w-4" /> Recharger
+            </button>
+          )}
+        </div>
+
+        {/* Method choice */}
+        {mode === "choice" && (
+          <div className="rounded-3xl glass-strong p-5">
+            <div className="mb-3 flex items-center justify-between">
+              <h2 className="text-base font-bold">Choisissez un moyen de recharge</h2>
+              <button onClick={() => setMode("home")} className="text-xs text-muted-foreground hover:underline">Annuler</button>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <button
+                onClick={() => setMode("momo")}
+                className="flex items-center gap-3 rounded-2xl border border-white/70 bg-white/80 p-4 text-left hover:bg-white"
+              >
+                <span className="grid h-11 w-11 place-items-center rounded-xl bg-gradient-to-br from-amber-500 to-orange-600 text-white">
+                  <Smartphone className="h-5 w-5" />
+                </span>
+                <span>
+                  <span className="block text-sm font-bold">Mobile Money</span>
+                  <span className="block text-[11px] text-muted-foreground">MTN, Moov, Orange, Wave… dès 100 F</span>
+                </span>
+              </button>
+              <button
+                onClick={() => setMode("ton")}
+                className="flex items-center gap-3 rounded-2xl border border-white/70 bg-white/80 p-4 text-left hover:bg-white"
+              >
+                <span className="grid h-11 w-11 place-items-center rounded-xl bg-gradient-to-br from-sky-500 to-blue-600 text-white">
+                  <Coins className="h-5 w-5" />
+                </span>
+                <span>
+                  <span className="block text-sm font-bold">Crypto TON / USDT</span>
+                  <span className="block text-[11px] text-muted-foreground">Crédit automatique avec votre memo</span>
+                </span>
+              </button>
+            </div>
+          </div>
+        )}
+
+        {(mode === "momo" || mode === "ton") && (
+          <button
+            onClick={() => setMode("choice")}
+            className="flex items-center gap-1 text-xs font-medium text-muted-foreground hover:underline"
+          >
+            <ChevronLeft className="h-3.5 w-3.5" /> Changer de moyen de recharge
+          </button>
+        )}
+
+        {mode === "momo" && <MobileMoneyTopup />}
+
+        {mode === "ton" && (
+          <div className="overflow-hidden rounded-3xl glass-strong">
+            <div className="flex items-center gap-2 border-b border-white/60 p-4">
+              <span className="grid h-9 w-9 place-items-center rounded-xl bg-gradient-to-br from-emerald-500 to-green-600 text-white">
+                <ArrowDownToLine className="h-5 w-5" />
+              </span>
+              <h2 className="text-base font-bold">Recharger en TON</h2>
             </div>
 
-            {/* QR code */}
-            {tonLink && (
-              <div className="grid place-items-center rounded-2xl bg-white p-4">
-                <QRCodeSVG value={tonLink} size={180} level="M" />
-                <p className="mt-2 text-[11px] text-muted-foreground">Scannez avec votre wallet TON</p>
+            <div className="space-y-4 p-5">
+              <div className="rounded-2xl border-2 border-red-500 bg-red-50 p-4">
+                <div className="flex items-start gap-2">
+                  <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-red-600" />
+                  <div className="text-sm text-red-700">
+                    <p className="font-bold uppercase">⚠️ Important — À lire avant tout envoi</p>
+                    <p className="mt-1">
+                      Vous <strong>DEVEZ</strong> coller le <strong>MEMO ci-dessous</strong> dans le champ "memo / commentaire / tag"
+                      de votre wallet avant de confirmer la transaction.
+                    </p>
+                    <p className="mt-2 font-bold text-red-800">
+                      ❌ Sans memo (ou avec un memo incorrect), votre dépôt sera <u>PERDU DÉFINITIVEMENT</u> et irrécupérable.
+                    </p>
+                  </div>
+                </div>
               </div>
-            )}
 
-            <Field label="Adresse de réception (TON)" value={profile.ton_address} mono />
-            <Field label="VOTRE MEMO PERSONNEL (obligatoire)" value={profile.deposit_memo} mono highlight />
+              {tonLink && (
+                <div className="grid place-items-center rounded-2xl bg-white p-4">
+                  <QRCodeSVG value={tonLink} size={180} level="M" />
+                  <p className="mt-2 text-[11px] text-muted-foreground">Scannez avec votre wallet TON</p>
+                </div>
+              )}
 
-            <p className="rounded-xl bg-white/60 p-3 text-[11px] text-muted-foreground">
-              Après envoi, votre solde sera crédité automatiquement en moins d'une minute.
-              Vous pouvez aussi forcer une vérification immédiate ci-dessous.
-            </p>
+              <Field label="Adresse de réception (TON)" value={profile.ton_address} mono />
+              <Field label="VOTRE MEMO PERSONNEL (obligatoire)" value={profile.deposit_memo} mono highlight />
 
-            <button
-              onClick={() => refresh.mutate()}
-              disabled={refresh.isPending}
-              className="flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-br from-primary to-sky-500 px-4 py-3 text-sm font-semibold text-primary-foreground disabled:opacity-50"
-            >
-              {refresh.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
-              Vérifier mon dépôt maintenant
-            </button>
+              <p className="rounded-xl bg-white/60 p-3 text-[11px] text-muted-foreground">
+                Après envoi, votre solde sera crédité automatiquement en moins d'une minute.
+              </p>
+
+              <button
+                onClick={() => refresh.mutate()}
+                disabled={refresh.isPending}
+                className="flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-br from-primary to-sky-500 px-4 py-3 text-sm font-semibold text-primary-foreground disabled:opacity-50"
+              >
+                {refresh.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+                Vérifier mon dépôt maintenant
+              </button>
+            </div>
           </div>
-        </div>
+        )}
 
         {/* Deposit history */}
         <div className="rounded-3xl glass-strong p-5">
@@ -176,12 +247,10 @@ function WalletPage() {
             </ul>
           )}
         </div>
-
       </div>
     </AppShell>
   );
 }
-
 
 function Field({ label, value, highlight, mono }: { label: string; value: string; highlight?: boolean; mono?: boolean }) {
   return (

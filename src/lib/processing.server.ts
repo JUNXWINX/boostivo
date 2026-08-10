@@ -14,12 +14,34 @@ export function mapProviderStatus(raw?: string): "sent" | "completed" | "failed"
   return "sent";
 }
 
-/** Manual mode by default: orders are only pushed to the provider when enabled. */
+/** Auto-send is ON by default: orders go straight to the provider. */
 export async function autoSendEnabled(): Promise<boolean> {
   const { data } = await supabaseAdmin
     .from("settings").select("value").eq("key", "auto_send_orders").maybeSingle();
-  return String(data?.value ?? "false") === "true";
+  if (data?.value == null) return true;
+  return String(data.value) !== "false";
 }
+
+/** Errors that are temporary (provider wallet empty, network, rate limit): keep the order queued. */
+export function isRetryableProviderError(msg?: string): boolean {
+  if (!msg) return true;
+  const s = msg.toLowerCase();
+  return (
+    s.includes("not_enough_funds") ||
+    s.includes("insufficient") ||
+    s.includes("balance") ||
+    s.includes("timeout") ||
+    s.includes("timed out") ||
+    s.includes("fetch") ||
+    s.includes("network") ||
+    s.includes("econn") ||
+    s.includes("429") ||
+    s.includes("rate limit") ||
+    s.includes("try again") ||
+    s.includes("non-json")
+  );
+}
+
 
 export async function syncOrderStatus(orderId: string): Promise<{ ok: boolean; status?: string; provider?: ProviderStatus; error?: string }> {
   const { data: order, error } = await supabaseAdmin
@@ -84,42 +106,95 @@ export async function syncUserOpenOrders(userId: string): Promise<{ synced: numb
 }
 
 
-export async function pushToProvider(orderId: string): Promise<{ ok: boolean; status: string; error?: string }> {
+/** Human readable French message for a provider error code. */
+export function providerErrorMessage(raw?: string): string {
+  const s = (raw || "").toLowerCase();
+  if (s.includes("not_enough_funds") || s.includes("insufficient") || s.includes("balance"))
+    return "Solde fournisseur insuffisant — la commande est en file d'attente et partira automatiquement.";
+  if (s.includes("incorrect link") || s.includes("link")) return "Lien invalide pour ce service.";
+  if (s.includes("quantity")) return "Quantité non acceptée par le fournisseur.";
+  if (s.includes("service")) return "Service momentanément indisponible chez le fournisseur.";
+  if (!raw) return "Erreur inconnue.";
+  return raw;
+}
+
+export async function pushToProvider(orderId: string): Promise<{ ok: boolean; status: string; error?: string; retryable?: boolean }> {
   const { data: order, error } = await supabaseAdmin
     .from("orders")
-    .select("id, status, quantity, link, service_id, service:services(provider_id)")
+    .select("id, status, quantity, link, provider_order_id, provider_response, service_id, service:services(provider_id)")
     .eq("id", orderId)
     .maybeSingle();
-  if (error || !order) return { ok: false, status: "missing", error: error?.message };
-  if (order.status !== "paid") return { ok: false, status: order.status, error: "Pas en statut payé" };
+  if (error || !order) return { ok: false, status: "missing", error: error?.message ?? "Commande introuvable" };
+  if (order.provider_order_id) return { ok: true, status: order.status };
+  if (order.status !== "paid" && order.status !== "failed") {
+    return { ok: false, status: order.status, error: "Commande non payée" };
+  }
 
   const providerId = (order.service as { provider_id?: string } | null)?.provider_id;
-  if (!providerId) return { ok: false, status: "failed", error: "Service sans provider_id" };
-
-  try {
-    const res = await addOrder({ service: providerId, link: order.link, quantity: order.quantity });
-    if (res.error || !res.order) {
-      await supabaseAdmin.from("orders").update({
-        status: "failed", provider_response: res.raw as never,
-      }).eq("id", orderId);
-      return { ok: false, status: "failed", error: res.error || "Pas d'ID commande renvoyé" };
-    }
-    await supabaseAdmin.from("orders").update({
-      status: "sent",
-      sent_at: new Date().toISOString(),
-      provider_order_id: String(res.order),
-      provider_response: res.raw as never,
-    }).eq("id", orderId);
-    return { ok: true, status: "sent" };
-  } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e);
+  if (!providerId) {
     await supabaseAdmin.from("orders").update({
       status: "failed",
-      provider_response: { error: msg } as never,
+      provider_response: { error: "Service sans identifiant fournisseur", retryable: false } as never,
     }).eq("id", orderId);
-    return { ok: false, status: "failed", error: msg };
+    return { ok: false, status: "failed", error: "Service sans provider_id", retryable: false };
   }
+
+  const prev = (order.provider_response ?? {}) as { attempts?: number };
+  const attempts = Number(prev.attempts ?? 0) + 1;
+
+  let errMsg = "";
+  try {
+    const res = await addOrder({ service: providerId, link: order.link, quantity: order.quantity });
+    if (!res.error && res.order) {
+      await supabaseAdmin.from("orders").update({
+        status: "sent",
+        sent_at: new Date().toISOString(),
+        provider_order_id: String(res.order),
+        provider_response: res.raw as never,
+      }).eq("id", orderId);
+      return { ok: true, status: "sent" };
+    }
+    errMsg = String(res.error || "Pas d'ID commande renvoyé");
+  } catch (e) {
+    errMsg = e instanceof Error ? e.message : String(e);
+  }
+
+  const retryable = isRetryableProviderError(errMsg) && attempts < 50;
+  await supabaseAdmin.from("orders").update({
+    // keep the order "paid" (queued) when the failure is temporary
+    status: retryable ? "paid" : "failed",
+    provider_response: {
+      error: errMsg,
+      message: providerErrorMessage(errMsg),
+      retryable,
+      attempts,
+      last_try: new Date().toISOString(),
+    } as never,
+  }).eq("id", orderId);
+  return { ok: false, status: retryable ? "paid" : "failed", error: errMsg, retryable };
 }
+
+/** Push every paid order that has not reached the provider yet. */
+export async function dispatchPendingOrders(limit = 20, userId?: string): Promise<{ tried: number; sent: number }> {
+  let q = supabaseAdmin
+    .from("orders")
+    .select("id")
+    .eq("status", "paid")
+    .is("provider_order_id", null)
+    .order("created_at", { ascending: true })
+    .limit(limit);
+  if (userId) q = q.eq("user_id", userId);
+  const { data: rows } = await q;
+  let sent = 0;
+  for (const r of rows ?? []) {
+    try {
+      const res = await pushToProvider(r.id);
+      if (res.ok) sent++;
+    } catch { /* keep going */ }
+  }
+  return { tried: rows?.length ?? 0, sent };
+}
+
 
 export async function runTonCheck(): Promise<{ scanned: number; orderMatches: number; depositCredits: number; pushed: number }> {
   const address = process.env.TON_RECEIVE_ADDRESS;
@@ -228,6 +303,12 @@ export async function runTonCheck(): Promise<{ scanned: number; orderMatches: nu
   } catch {
     // silent — USDT scan is best-effort
   }
+
+  // Retry every paid order still waiting to reach the provider
+  try {
+    const d = await dispatchPendingOrders(20);
+    pushed += d.sent;
+  } catch { /* best-effort */ }
 
   return { scanned: txs.length, orderMatches, depositCredits, pushed };
 }
