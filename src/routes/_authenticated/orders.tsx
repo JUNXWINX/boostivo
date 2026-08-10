@@ -176,7 +176,7 @@ function StatusBadge({ status }: { status: string }) {
   const label =
     status === "completed" ? "Terminée"
     : status === "sent" ? "En cours"
-    : status === "paid" ? "Payée"
+    : status === "paid" ? "Payée · en file d'envoi"
     : status === "pending" ? "En attente paiement"
     : status === "failed" ? "Échec" : status;
   return <span className={`mt-1 inline-block rounded-full px-2 py-0.5 text-[10px] font-medium ${cls}`}>{label}</span>;
