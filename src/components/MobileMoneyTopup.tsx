@@ -1,22 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { Check, Copy, Loader2, Smartphone } from "lucide-react";
+import { Loader2, Smartphone } from "lucide-react";
 import { useMemo, useState } from "react";
 import { createTopupRequest, getMomoAccounts, getMyTopups } from "@/lib/boostvari.functions";
 import { formatNumber } from "@/lib/format";
-
-function Copyable({ value }: { value: string }) {
-  const [copied, setCopied] = useState(false);
-  return (
-    <button
-      onClick={() => { navigator.clipboard.writeText(value); setCopied(true); setTimeout(() => setCopied(false), 1500); }}
-      className="grid h-8 w-8 shrink-0 place-items-center rounded-md bg-white/70 hover:bg-white"
-      aria-label="Copier le numéro"
-    >
-      {copied ? <Check className="h-4 w-4 text-emerald-600" /> : <Copy className="h-4 w-4" />}
-    </button>
-  );
-}
 
 export function MobileMoneyTopup() {
   const qc = useQueryClient();
@@ -89,25 +76,8 @@ export function MobileMoneyTopup() {
           </select>
         </div>
 
-        {activeOp && (
-          <div className="rounded-2xl border-2 border-amber-400 bg-amber-50 p-4 text-sm">
-            <p className="font-bold text-amber-800">1. Envoyez le montant à ce numéro :</p>
-            <div className="mt-2 flex items-center gap-2 rounded-xl bg-white px-3 py-2">
-              <span className="flex-1 font-mono text-base font-bold">{activeOp.number}</span>
-              <Copyable value={activeOp.number} />
-            </div>
-            <p className="mt-1 text-xs text-amber-800">Nom du compte : <strong>{activeOp.name}</strong></p>
-            <p className="mt-2 text-xs text-amber-800">
-              2. Remplissez le formulaire ci-dessous avec le <strong>numéro qui a envoyé l'argent</strong> et le montant exact.
-              Votre solde est crédité après vérification par l'administrateur.
-            </p>
-          </div>
-        )}
-
         <div>
-          <label htmlFor="momo-phone" className="mb-1 block text-xs font-semibold">
-            Votre numéro Mobile Money (celui qui est débité)
-          </label>
+          <label htmlFor="momo-phone" className="mb-1 block text-xs font-semibold">Votre numéro Mobile Money</label>
           <input
             id="momo-phone"
             inputMode="tel"
@@ -119,7 +89,7 @@ export function MobileMoneyTopup() {
         </div>
 
         <div>
-          <label htmlFor="momo-amount" className="mb-1 block text-xs font-semibold">Montant envoyé (FCFA)</label>
+          <label htmlFor="momo-amount" className="mb-1 block text-xs font-semibold">Montant à envoyer (FCFA)</label>
           <input
             id="momo-amount"
             inputMode="numeric"
@@ -130,7 +100,6 @@ export function MobileMoneyTopup() {
           />
           <p className="mt-1 text-[11px] text-muted-foreground">Minimum 100 FCFA.</p>
         </div>
-
 
         {submit.error && (
           <p className="rounded-xl bg-red-50 p-3 text-xs text-red-700">{(submit.error as Error).message}</p>
@@ -147,7 +116,7 @@ export function MobileMoneyTopup() {
           className="flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-br from-amber-500 to-orange-600 px-4 py-3 text-sm font-semibold text-white disabled:opacity-50"
         >
           {submit.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
-          J'ai payé — envoyer ma demande
+          Confirmer
         </button>
 
         {topups.length > 0 && (
