@@ -216,19 +216,19 @@ export const createOrder = createServerFn({ method: "POST" })
       throw new Error(error.message);
     }
 
-    // Provider dispatch: only when auto-send is enabled (default = manual mode)
+    // Provider dispatch: automatic by default; failures stay queued and are retried
+    let dispatch: { ok: boolean; status: string; error?: string; retryable?: boolean } | null = null;
     if (usedBalance) {
       try {
-        const { data: setting } = await supabaseAdmin
-          .from("settings").select("value").eq("key", "auto_send_orders").maybeSingle();
-        if (String(setting?.value ?? "false") === "true") {
-          const { pushToProvider } = await import("./processing.server");
-          await pushToProvider(inserted.id);
+        const { pushToProvider, autoSendEnabled } = await import("./processing.server");
+        if (await autoSendEnabled()) {
+          dispatch = await pushToProvider(inserted.id);
         }
       } catch (e) {
         console.error("[order] push failed", e);
       }
     }
+
 
 
     return {
