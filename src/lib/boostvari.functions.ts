@@ -107,7 +107,8 @@ export const getMyOrders = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
     try {
-      const { syncUserOpenOrders } = await import("./processing.server");
+      const { syncUserOpenOrders, dispatchPendingOrders } = await import("./processing.server");
+      await dispatchPendingOrders(5, context.userId);
       await syncUserOpenOrders(context.userId);
     } catch (e) {
       console.error("[getMyOrders] sync failed", e);
