@@ -126,7 +126,8 @@ export const getMyOrders = createServerFn({ method: "GET" })
 export const syncMyOrders = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
-    const { syncUserOpenOrders } = await import("./processing.server");
+    const { syncUserOpenOrders, dispatchPendingOrders } = await import("./processing.server");
+    await dispatchPendingOrders(10, context.userId);
     return syncUserOpenOrders(context.userId);
   });
 
