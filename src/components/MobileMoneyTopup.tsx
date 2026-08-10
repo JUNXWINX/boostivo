@@ -53,7 +53,7 @@ export function MobileMoneyTopup() {
   });
 
   const amountNum = Number(amount);
-  const valid = activeOp && phone.trim().length >= 6 && amountNum >= 500;
+  const valid = activeOp && phone.trim().length >= 6 && amountNum >= 100;
 
   return (
     <div className="overflow-hidden rounded-3xl glass-strong">
@@ -105,9 +105,12 @@ export function MobileMoneyTopup() {
         )}
 
         <div>
-          <label htmlFor="momo-phone" className="mb-1 block text-xs font-semibold">Votre numéro d'envoi</label>
+          <label htmlFor="momo-phone" className="mb-1 block text-xs font-semibold">
+            Votre numéro Mobile Money (celui qui est débité)
+          </label>
           <input
             id="momo-phone"
+            inputMode="tel"
             value={phone}
             onChange={(e) => { setPhone(e.target.value); setDone(false); }}
             placeholder="+229 ..."
@@ -122,11 +125,12 @@ export function MobileMoneyTopup() {
             inputMode="numeric"
             value={amount}
             onChange={(e) => { setAmount(e.target.value.replace(/[^0-9]/g, "")); setDone(false); }}
-            placeholder="5000"
+            placeholder="1000"
             className="w-full rounded-xl border border-white/70 bg-white/80 px-3 py-2 text-sm"
           />
-          <p className="mt-1 text-[11px] text-muted-foreground">Minimum 500 FCFA.</p>
+          <p className="mt-1 text-[11px] text-muted-foreground">Minimum 100 FCFA.</p>
         </div>
+
 
         {submit.error && (
           <p className="rounded-xl bg-red-50 p-3 text-xs text-red-700">{(submit.error as Error).message}</p>
