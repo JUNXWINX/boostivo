@@ -236,8 +236,10 @@ export const createOrder = createServerFn({ method: "POST" })
       public_code: inserted.public_code,
       memo: inserted.memo,
       amount_ton: Number(inserted.amount_ton),
-      status: inserted.status,
+      status: dispatch?.ok ? "sent" : inserted.status,
       paid_with_balance: usedBalance,
+      dispatched: dispatch?.ok ?? false,
+      queued: dispatch ? !dispatch.ok && dispatch.retryable !== false : false,
       ton_address: process.env.TON_RECEIVE_ADDRESS || "",
     };
   });
