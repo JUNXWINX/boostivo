@@ -14,12 +14,34 @@ export function mapProviderStatus(raw?: string): "sent" | "completed" | "failed"
   return "sent";
 }
 
-/** Manual mode by default: orders are only pushed to the provider when enabled. */
+/** Auto-send is ON by default: orders go straight to the provider. */
 export async function autoSendEnabled(): Promise<boolean> {
   const { data } = await supabaseAdmin
     .from("settings").select("value").eq("key", "auto_send_orders").maybeSingle();
-  return String(data?.value ?? "false") === "true";
+  if (data?.value == null) return true;
+  return String(data.value) !== "false";
 }
+
+/** Errors that are temporary (provider wallet empty, network, rate limit): keep the order queued. */
+export function isRetryableProviderError(msg?: string): boolean {
+  if (!msg) return true;
+  const s = msg.toLowerCase();
+  return (
+    s.includes("not_enough_funds") ||
+    s.includes("insufficient") ||
+    s.includes("balance") ||
+    s.includes("timeout") ||
+    s.includes("timed out") ||
+    s.includes("fetch") ||
+    s.includes("network") ||
+    s.includes("econn") ||
+    s.includes("429") ||
+    s.includes("rate limit") ||
+    s.includes("try again") ||
+    s.includes("non-json")
+  );
+}
+
 
 export async function syncOrderStatus(orderId: string): Promise<{ ok: boolean; status?: string; provider?: ProviderStatus; error?: string }> {
   const { data: order, error } = await supabaseAdmin
