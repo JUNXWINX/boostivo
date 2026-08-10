@@ -1,6 +1,7 @@
 import { Link } from "@tanstack/react-router";
 import { Rocket } from "lucide-react";
 import type { ReactNode } from "react";
+import { AssistantChat } from "./AssistantChat";
 import { BalancePill } from "./BalancePill";
 import { CurrencySwitcher } from "./CurrencySwitcher";
 
@@ -29,8 +30,9 @@ export function AppShell({ children, right }: { children: ReactNode; right?: Rea
       </header>
       <main className="mx-auto max-w-5xl px-3 py-4 sm:px-4 sm:py-6">{children}</main>
       <footer className="mx-auto max-w-5xl px-4 py-8 text-center text-[11px] text-muted-foreground">
-        Boostivo — Paiements crypto (TON & USDT) · Livraison automatique
+        Boostivo — Mobile Money & crypto (TON / USDT) · Livraison rapide et suivi en temps réel
       </footer>
+      <AssistantChat />
     </div>
   );
 }
