@@ -527,7 +527,7 @@ export const createTopupRequest = createServerFn({ method: "POST" })
       country: z.string().min(1).max(60),
       operator: z.string().min(1).max(60),
       phone: z.string().trim().min(6).max(25),
-      amount_xof: z.number().int().min(500).max(5_000_000),
+      amount_xof: z.number().int().min(100).max(5_000_000),
     }).parse(d),
   )
   .handler(async ({ context, data }) => {
