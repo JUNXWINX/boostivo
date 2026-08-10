@@ -710,7 +710,7 @@ export const adminGetAutoSend = createServerFn({ method: "GET" })
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data } = await supabaseAdmin
       .from("settings").select("value").eq("key", "auto_send_orders").maybeSingle();
-    return { auto: String(data?.value ?? "false") === "true" };
+    return { auto: data?.value == null ? true : String(data.value) !== "false" };
   });
 
 export const adminSetAutoSend = createServerFn({ method: "POST" })
