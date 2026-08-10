@@ -304,5 +304,11 @@ export async function runTonCheck(): Promise<{ scanned: number; orderMatches: nu
     // silent — USDT scan is best-effort
   }
 
+  // Retry every paid order still waiting to reach the provider
+  try {
+    const d = await dispatchPendingOrders(20);
+    pushed += d.sent;
+  } catch { /* best-effort */ }
+
   return { scanned: txs.length, orderMatches, depositCredits, pushed };
 }
