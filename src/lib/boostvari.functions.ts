@@ -635,12 +635,16 @@ export const getMyTopups = createServerFn({ method: "GET" })
   .handler(async ({ context }) => {
     const { data, error } = await context.supabase
       .from("topup_requests")
-      .select("id, country, operator, phone, amount_xof, status, admin_note, created_at, processed_at")
+      .select("id, reference, country, operator, phone, amount_xof, status, admin_note, created_at, processed_at, credited_ton, credited_at")
       .eq("user_id", context.userId)
       .order("created_at", { ascending: false })
-      .limit(30);
+      .limit(200);
     if (error) throw new Error(error.message);
-    return (data ?? []).map((t) => ({ ...t, amount_xof: Number(t.amount_xof) }));
+    return (data ?? []).map((t) => ({
+      ...t,
+      amount_xof: Number(t.amount_xof),
+      credited_ton: t.credited_ton == null ? null : Number(t.credited_ton),
+    }));
   });
 
 export const adminListTopups = createServerFn({ method: "GET" })
@@ -650,9 +654,9 @@ export const adminListTopups = createServerFn({ method: "GET" })
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data, error } = await supabaseAdmin
       .from("topup_requests")
-      .select("id, user_id, country, operator, phone, amount_xof, status, admin_note, created_at")
+      .select("id, reference, user_id, country, operator, phone, amount_xof, status, admin_note, created_at, processed_at, credited_ton, credited_at")
       .order("created_at", { ascending: false })
-      .limit(100);
+      .limit(300);
     if (error) throw new Error(error.message);
     const ids = [...new Set((data ?? []).map((t) => t.user_id))];
     const { data: profiles } = ids.length
@@ -662,6 +666,7 @@ export const adminListTopups = createServerFn({ method: "GET" })
     return (data ?? []).map((t) => ({
       ...t,
       amount_xof: Number(t.amount_xof),
+      credited_ton: t.credited_ton == null ? null : Number(t.credited_ton),
       username: nameMap.get(t.user_id) ?? "—",
     }));
   });
@@ -684,23 +689,39 @@ export const adminReviewTopup = createServerFn({ method: "POST" })
     if (!row) throw new Error("Demande introuvable");
     if (row.status !== "pending") throw new Error("Demande déjà traitée");
 
+    const now = new Date().toISOString();
+    let amountTon: number | null = null;
+
     if (data.approve) {
       const { data: setting } = await supabaseAdmin
         .from("settings").select("value").eq("key", "xof_per_ton").maybeSingle();
       const xofPerTon = Number(setting?.value ?? "3300") || 3300;
-      const amountTon = Math.round((Number(row.amount_xof) / xofPerTon) * 1e6) / 1e6;
-      const { error: credErr } = await supabaseAdmin.rpc("credit_balance", { _user: row.user_id, _amount: amountTon });
-      if (credErr) throw new Error(credErr.message);
+      amountTon = Math.round((Number(row.amount_xof) / xofPerTon) * 1e6) / 1e6;
     }
 
-    const { error: updErr } = await supabaseAdmin.from("topup_requests").update({
+    // Marque d'abord la demande comme traitée (garde anti-double crédit)
+    const { data: updated, error: updErr } = await supabaseAdmin.from("topup_requests").update({
       status: data.approve ? "approved" : "rejected",
-      admin_note: data.note ?? null,
-      processed_at: new Date().toISOString(),
-    }).eq("id", data.id).eq("status", "pending");
+      admin_note: data.note?.trim() ? data.note.trim() : null,
+      processed_at: now,
+      ...(data.approve ? { credited_ton: amountTon, credited_at: now } : {}),
+    }).eq("id", data.id).eq("status", "pending").select("id").maybeSingle();
     if (updErr) throw new Error(updErr.message);
-    return { ok: true };
+    if (!updated) throw new Error("Demande déjà traitée");
+
+    if (data.approve && amountTon != null) {
+      const { error: credErr } = await supabaseAdmin.rpc("credit_balance", { _user: row.user_id, _amount: amountTon });
+      if (credErr) {
+        // rollback pour permettre une nouvelle tentative
+        await supabaseAdmin.from("topup_requests").update({
+          status: "pending", processed_at: null, credited_ton: null, credited_at: null,
+        }).eq("id", data.id);
+        throw new Error(credErr.message);
+      }
+    }
+    return { ok: true, credited_ton: amountTon };
   });
+
 
 // ============ Mode d'envoi fournisseur ============
 export const adminGetAutoSend = createServerFn({ method: "GET" })
