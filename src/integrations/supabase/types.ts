@@ -288,10 +288,13 @@ export type Database = {
           amount_xof: number
           country: string
           created_at: string
+          credited_at: string | null
+          credited_ton: number | null
           id: string
           operator: string
           phone: string
           processed_at: string | null
+          reference: string | null
           status: string
           updated_at: string
           user_id: string
@@ -301,10 +304,13 @@ export type Database = {
           amount_xof: number
           country: string
           created_at?: string
+          credited_at?: string | null
+          credited_ton?: number | null
           id?: string
           operator: string
           phone: string
           processed_at?: string | null
+          reference?: string | null
           status?: string
           updated_at?: string
           user_id: string
@@ -314,10 +320,13 @@ export type Database = {
           amount_xof?: number
           country?: string
           created_at?: string
+          credited_at?: string | null
+          credited_ton?: number | null
           id?: string
           operator?: string
           phone?: string
           processed_at?: string | null
+          reference?: string | null
           status?: string
           updated_at?: string
           user_id?: string
