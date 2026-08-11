@@ -16,6 +16,7 @@ import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as OrderCodeRouteImport } from './routes/order.$code'
 import { Route as AuthenticatedWalletRouteImport } from './routes/_authenticated/wallet'
+import { Route as AuthenticatedRechargesRouteImport } from './routes/_authenticated/recharges'
 import { Route as AuthenticatedOrdersRouteImport } from './routes/_authenticated/orders'
 import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated/admin'
 import { Route as ApiPublicTonCheckRouteImport } from './routes/api/public/ton-check'
@@ -55,6 +56,11 @@ const AuthenticatedWalletRoute = AuthenticatedWalletRouteImport.update({
   path: '/wallet',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedRechargesRoute = AuthenticatedRechargesRouteImport.update({
+  id: '/recharges',
+  path: '/recharges',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 const AuthenticatedOrdersRoute = AuthenticatedOrdersRouteImport.update({
   id: '/orders',
   path: '/orders',
@@ -83,6 +89,7 @@ export interface FileRoutesByFullPath {
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/admin': typeof AuthenticatedAdminRoute
   '/orders': typeof AuthenticatedOrdersRoute
+  '/recharges': typeof AuthenticatedRechargesRoute
   '/wallet': typeof AuthenticatedWalletRoute
   '/order/$code': typeof OrderCodeRoute
   '/api/public/refresh-rates': typeof ApiPublicRefreshRatesRoute
@@ -95,6 +102,7 @@ export interface FileRoutesByTo {
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/admin': typeof AuthenticatedAdminRoute
   '/orders': typeof AuthenticatedOrdersRoute
+  '/recharges': typeof AuthenticatedRechargesRoute
   '/wallet': typeof AuthenticatedWalletRoute
   '/order/$code': typeof OrderCodeRoute
   '/api/public/refresh-rates': typeof ApiPublicRefreshRatesRoute
@@ -109,6 +117,7 @@ export interface FileRoutesById {
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/_authenticated/admin': typeof AuthenticatedAdminRoute
   '/_authenticated/orders': typeof AuthenticatedOrdersRoute
+  '/_authenticated/recharges': typeof AuthenticatedRechargesRoute
   '/_authenticated/wallet': typeof AuthenticatedWalletRoute
   '/order/$code': typeof OrderCodeRoute
   '/api/public/refresh-rates': typeof ApiPublicRefreshRatesRoute
@@ -123,6 +132,7 @@ export interface FileRouteTypes {
     | '/sitemap.xml'
     | '/admin'
     | '/orders'
+    | '/recharges'
     | '/wallet'
     | '/order/$code'
     | '/api/public/refresh-rates'
@@ -135,6 +145,7 @@ export interface FileRouteTypes {
     | '/sitemap.xml'
     | '/admin'
     | '/orders'
+    | '/recharges'
     | '/wallet'
     | '/order/$code'
     | '/api/public/refresh-rates'
@@ -148,6 +159,7 @@ export interface FileRouteTypes {
     | '/sitemap.xml'
     | '/_authenticated/admin'
     | '/_authenticated/orders'
+    | '/_authenticated/recharges'
     | '/_authenticated/wallet'
     | '/order/$code'
     | '/api/public/refresh-rates'
@@ -216,6 +228,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedWalletRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/recharges': {
+      id: '/_authenticated/recharges'
+      path: '/recharges'
+      fullPath: '/recharges'
+      preLoaderRoute: typeof AuthenticatedRechargesRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/orders': {
       id: '/_authenticated/orders'
       path: '/orders'
@@ -250,12 +269,14 @@ declare module '@tanstack/react-router' {
 interface AuthenticatedRouteRouteChildren {
   AuthenticatedAdminRoute: typeof AuthenticatedAdminRoute
   AuthenticatedOrdersRoute: typeof AuthenticatedOrdersRoute
+  AuthenticatedRechargesRoute: typeof AuthenticatedRechargesRoute
   AuthenticatedWalletRoute: typeof AuthenticatedWalletRoute
 }
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedAdminRoute: AuthenticatedAdminRoute,
   AuthenticatedOrdersRoute: AuthenticatedOrdersRoute,
+  AuthenticatedRechargesRoute: AuthenticatedRechargesRoute,
   AuthenticatedWalletRoute: AuthenticatedWalletRoute,
 }
 
@@ -275,13 +296,3 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}
