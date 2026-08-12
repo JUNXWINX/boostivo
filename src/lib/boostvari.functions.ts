@@ -560,14 +560,19 @@ export const adminRecalcPrices = createServerFn({ method: "POST" })
 export type MomoAccount = { country: string; operator: string; number: string; name: string };
 
 const DEFAULT_MOMO: MomoAccount[] = [
-  { country: "Bénin", operator: "MTN MoMo", number: "+229 00 00 00 00", name: "Boostivo" },
-  { country: "Bénin", operator: "Moov Money", number: "+229 00 00 00 00", name: "Boostivo" },
-  { country: "Côte d'Ivoire", operator: "Orange Money", number: "+225 00 00 00 00", name: "Boostivo" },
-  { country: "Côte d'Ivoire", operator: "Wave", number: "+225 00 00 00 00", name: "Boostivo" },
-  { country: "Togo", operator: "T-Money", number: "+228 00 00 00 00", name: "Boostivo" },
-  { country: "Sénégal", operator: "Wave", number: "+221 00 00 00 00", name: "Boostivo" },
-  { country: "Burkina Faso", operator: "Orange Money", number: "+226 00 00 00 00", name: "Boostivo" },
-  { country: "Mali", operator: "Orange Money", number: "+223 00 00 00 00", name: "Boostivo" },
+  { country: "Bénin", operator: "MTN", number: "+229 00 00 00 00", name: "Boostivo" },
+  { country: "Bénin", operator: "MOOV", number: "+229 00 00 00 00", name: "Boostivo" },
+  { country: "Bénin", operator: "CELTIIS", number: "+229 00 00 00 00", name: "Boostivo" },
+  { country: "Côte d'Ivoire", operator: "MOOV", number: "+225 00 00 00 00", name: "Boostivo" },
+  { country: "Côte d'Ivoire", operator: "MTN", number: "+225 00 00 00 00", name: "Boostivo" },
+  { country: "Côte d'Ivoire", operator: "ORANGE", number: "+225 00 00 00 00", name: "Boostivo" },
+  { country: "Côte d'Ivoire", operator: "WAVE", number: "+225 00 00 00 00", name: "Boostivo" },
+  { country: "Burkina Faso", operator: "ORANGE", number: "+226 00 00 00 00", name: "Boostivo" },
+  { country: "Burkina Faso", operator: "MOOV", number: "+226 00 00 00 00", name: "Boostivo" },
+  { country: "Sénégal", operator: "FREE", number: "+221 00 00 00 00", name: "Boostivo" },
+  { country: "Sénégal", operator: "ORANGE", number: "+221 00 00 00 00", name: "Boostivo" },
+  { country: "Togo", operator: "TOGOCOM", number: "+228 00 00 00 00", name: "Boostivo" },
+  { country: "Togo", operator: "MOOV", number: "+228 00 00 00 00", name: "Boostivo" },
 ];
 
 async function readMomoAccounts(): Promise<MomoAccount[]> {
