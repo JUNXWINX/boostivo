@@ -817,3 +817,263 @@ export const adminSetAutoSend = createServerFn({ method: "POST" })
     if (error) throw new Error(error.message);
     return { ok: true };
   });
+
+// ============ Parrainage ============
+export const getMyReferral = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { loadRates, MIN_WITHDRAW_XOF, MIN_WITHDRAW_USD, REFERRAL_PERCENT } =
+      await import("./referral.server");
+
+    const { data: prof, error } = await supabaseAdmin
+      .from("profiles")
+      .select("referral_code, referral_earnings_ton, referred_by")
+      .eq("user_id", context.userId)
+      .maybeSingle();
+    if (error) throw new Error(error.message);
+    if (!prof) throw new Error("Profil introuvable");
+
+    const [{ count: refCount }, { data: commissions }, { data: pending }] = await Promise.all([
+      supabaseAdmin.from("profiles").select("user_id", { count: "exact", head: true }).eq("referred_by", context.userId),
+      supabaseAdmin
+        .from("referral_commissions")
+        .select("id, amount_ton, order_amount_ton, created_at")
+        .eq("referrer_id", context.userId)
+        .order("created_at", { ascending: false })
+        .limit(50),
+      supabaseAdmin
+        .from("withdrawals")
+        .select("id")
+        .eq("user_id", context.userId)
+        .eq("status", "pending"),
+    ]);
+
+    const rates = await loadRates();
+    const list = (commissions ?? []).map((c) => ({
+      ...c,
+      amount_ton: Number(c.amount_ton),
+      order_amount_ton: Number(c.order_amount_ton),
+    }));
+
+    return {
+      referral_code: prof.referral_code as string,
+      link: `https://boostivo.lovable.app/auth?ref=${prof.referral_code}`,
+      earnings_ton: Number(prof.referral_earnings_ton),
+      total_earned_ton: list.reduce((s, c) => s + c.amount_ton, 0),
+      referrals: refCount ?? 0,
+      commissions: list,
+      pending_withdrawals: (pending ?? []).length,
+      percent: REFERRAL_PERCENT,
+      rates,
+      min_withdraw_ton: Math.max(MIN_WITHDRAW_XOF / rates.xof, MIN_WITHDRAW_USD / rates.usd),
+      min_withdraw_xof: MIN_WITHDRAW_XOF,
+      min_withdraw_usd: MIN_WITHDRAW_USD,
+    };
+  });
+
+/** Transfert des gains vers le solde principal (irréversible, utilisable seulement pour commander). */
+export const transferReferralEarnings = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) => z.object({ amount_ton: z.number().positive().max(1_000_000) }).parse(d))
+  .handler(async ({ context, data }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const amount = Math.round(data.amount_ton * 1e6) / 1e6;
+    const { data: ok, error } = await supabaseAdmin.rpc("transfer_referral_to_balance", {
+      _user: context.userId,
+      _amount: amount,
+    });
+    if (error) throw new Error(error.message);
+    if (!ok) throw new Error("Gains de parrainage insuffisants");
+    return { ok: true, transferred_ton: amount };
+  });
+
+export const createWithdrawal = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) =>
+    z
+      .object({
+        method: z.enum(["mobile_money", "crypto"]),
+        amount: z.number().positive().max(10_000_000),
+        currency: z.enum(["XOF", "USDT", "TON"]),
+        country: z.string().max(60).optional(),
+        operator: z.string().max(60).optional(),
+        phone: z.string().max(25).optional(),
+        holder_name: z.string().max(80).optional(),
+        crypto_asset: z.enum(["TON", "USDT"]).optional(),
+        crypto_address: z.string().max(140).optional(),
+      })
+      .superRefine((v, ctx) => {
+        if (v.method === "mobile_money") {
+          if (!v.country || !v.operator) ctx.addIssue({ code: "custom", message: "Pays et opérateur requis" });
+          if (!v.phone || v.phone.trim().length < 6) ctx.addIssue({ code: "custom", message: "Numéro de retrait requis" });
+          if (!v.holder_name || v.holder_name.trim().length < 3)
+            ctx.addIssue({ code: "custom", message: "Nom complet du titulaire requis" });
+        } else {
+          if (!v.crypto_address || v.crypto_address.trim().length < 10)
+            ctx.addIssue({ code: "custom", message: "Adresse crypto invalide" });
+        }
+      })
+      .parse(d),
+  )
+  .handler(async ({ context, data }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { loadRates, MIN_WITHDRAW_XOF, MIN_WITHDRAW_USD } = await import("./referral.server");
+    const rates = await loadRates();
+
+    const amountTon =
+      data.currency === "TON"
+        ? data.amount
+        : data.currency === "XOF"
+          ? data.amount / rates.xof
+          : data.amount / rates.usd;
+    const amount = Math.round(amountTon * 1e6) / 1e6;
+    const minTon = Math.max(MIN_WITHDRAW_XOF / rates.xof, MIN_WITHDRAW_USD / rates.usd);
+    if (amount < minTon) {
+      throw new Error(`Montant minimum : ${MIN_WITHDRAW_XOF} FCFA (ou ${MIN_WITHDRAW_USD} $)`);
+    }
+
+    const { data: ok, error: debErr } = await supabaseAdmin.rpc("debit_referral", {
+      _user: context.userId,
+      _amount: amount,
+    });
+    if (debErr) throw new Error(debErr.message);
+    if (!ok) throw new Error("Gains de parrainage insuffisants");
+
+    const { data: inserted, error } = await supabaseAdmin
+      .from("withdrawals")
+      .insert({
+        user_id: context.userId,
+        method: data.method,
+        amount_ton: amount,
+        amount_xof: Math.round(amount * rates.xof),
+        country: data.country ?? null,
+        operator: data.operator ?? null,
+        phone: data.phone?.trim() ?? null,
+        holder_name: data.holder_name?.trim() ?? null,
+        crypto_asset: data.method === "crypto" ? (data.crypto_asset ?? "TON") : null,
+        crypto_address: data.crypto_address?.trim() ?? null,
+        status: "pending",
+      })
+      .select("id, reference, amount_ton, amount_xof")
+      .maybeSingle();
+    if (error) {
+      await supabaseAdmin.rpc("credit_referral", { _user: context.userId, _amount: amount });
+      throw new Error(error.message);
+    }
+
+    try {
+      const { data: prof } = await supabaseAdmin
+        .from("profiles").select("username").eq("user_id", context.userId).maybeSingle();
+      const { notifyNewWithdrawal } = await import("./telegram.server");
+      await notifyNewWithdrawal({
+        reference: inserted?.reference ?? null,
+        username: prof?.username ?? null,
+        method: data.method,
+        amount_ton: amount,
+        amount_xof: inserted?.amount_xof == null ? null : Number(inserted.amount_xof),
+        country: data.country ?? null,
+        operator: data.operator ?? null,
+        phone: data.phone ?? null,
+        holder_name: data.holder_name ?? null,
+        crypto_asset: data.crypto_asset ?? "TON",
+        crypto_address: data.crypto_address ?? null,
+      });
+    } catch (e) {
+      console.error("Telegram notify (withdrawal) failed:", e);
+    }
+
+    return { ok: true, reference: inserted?.reference ?? null, amount_ton: amount };
+  });
+
+export const getMyWithdrawals = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { data, error } = await context.supabase
+      .from("withdrawals")
+      .select("id, reference, method, amount_ton, amount_xof, country, operator, phone, holder_name, crypto_asset, crypto_address, status, admin_note, created_at, processed_at")
+      .eq("user_id", context.userId)
+      .order("created_at", { ascending: false })
+      .limit(100);
+    if (error) throw new Error(error.message);
+    return (data ?? []).map((w) => ({
+      ...w,
+      amount_ton: Number(w.amount_ton),
+      amount_xof: w.amount_xof == null ? null : Number(w.amount_xof),
+    }));
+  });
+
+export const adminListWithdrawals = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    await assertAdmin(context);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data, error } = await supabaseAdmin
+      .from("withdrawals")
+      .select("*")
+      .order("created_at", { ascending: false })
+      .limit(300);
+    if (error) throw new Error(error.message);
+    const ids = [...new Set((data ?? []).map((w) => w.user_id))];
+    const { data: profiles } = ids.length
+      ? await supabaseAdmin.from("profiles").select("user_id, username").in("user_id", ids)
+      : { data: [] as { user_id: string; username: string }[] };
+    const nameMap = new Map((profiles ?? []).map((p) => [p.user_id, p.username]));
+    return (data ?? []).map((w) => ({
+      ...w,
+      amount_ton: Number(w.amount_ton),
+      amount_xof: w.amount_xof == null ? null : Number(w.amount_xof),
+      username: nameMap.get(w.user_id) ?? "—",
+    }));
+  });
+
+export const adminReviewWithdrawal = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) =>
+    z.object({ id: z.string().uuid(), approve: z.boolean(), note: z.string().max(300).optional() }).parse(d),
+  )
+  .handler(async ({ context, data }) => {
+    await assertAdmin(context);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: row, error } = await supabaseAdmin
+      .from("withdrawals").select("id, user_id, amount_ton, status, reference").eq("id", data.id).maybeSingle();
+    if (error) throw new Error(error.message);
+    if (!row) throw new Error("Demande introuvable");
+    if (row.status !== "pending") throw new Error("Demande déjà traitée");
+
+    const { data: updated, error: updErr } = await supabaseAdmin
+      .from("withdrawals")
+      .update({
+        status: data.approve ? "paid" : "rejected",
+        admin_note: data.note?.trim() ? data.note.trim() : null,
+        processed_at: new Date().toISOString(),
+      })
+      .eq("id", data.id).eq("status", "pending").select("id").maybeSingle();
+    if (updErr) throw new Error(updErr.message);
+    if (!updated) throw new Error("Demande déjà traitée");
+
+    // Refus : on rend les gains à l'utilisateur
+    if (!data.approve) {
+      const { error: credErr } = await supabaseAdmin.rpc("credit_referral", {
+        _user: row.user_id,
+        _amount: Number(row.amount_ton),
+      });
+      if (credErr) console.error("[withdrawal] refund failed", credErr);
+    }
+
+    try {
+      const { data: prof } = await supabaseAdmin
+        .from("profiles").select("username").eq("user_id", row.user_id).maybeSingle();
+      const { notifyWithdrawalReviewed } = await import("./telegram.server");
+      await notifyWithdrawalReviewed({
+        reference: row.reference,
+        username: prof?.username ?? null,
+        amount_ton: Number(row.amount_ton),
+        approved: data.approve,
+        note: data.note?.trim() || null,
+      });
+    } catch (e) {
+      console.error("Telegram notify (withdrawal reviewed) failed:", e);
+    }
+    return { ok: true };
+  });
