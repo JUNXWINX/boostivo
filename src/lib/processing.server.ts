@@ -303,7 +303,12 @@ export async function runTonCheck(): Promise<{ scanned: number; orderMatches: nu
       if (!depErr) {
         await supabaseAdmin.rpc("credit_balance", { _user: profile.user_id, _amount: amountTonEquivalent });
         depositCredits++;
+        try {
+          const { notifyCryptoDeposit } = await import("@/lib/telegram.server");
+          await notifyCryptoDeposit({ amount: ev.amount, asset: "USDT", memo: ev.memo });
+        } catch { /* best-effort */ }
       }
+
     }
   } catch {
     // silent — USDT scan is best-effort
