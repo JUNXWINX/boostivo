@@ -5,6 +5,7 @@ import { Loader2, RefreshCw, Send, LogOut } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
 import { MarginsPanel } from "@/components/admin/MarginsPanel";
 import { TopupsPanel } from "@/components/admin/TopupsPanel";
+import { WithdrawalsPanel } from "@/components/admin/WithdrawalsPanel";
 import {
   adminListOrders,
   adminStats,
@@ -110,6 +111,7 @@ function AdminPage() {
       )}
 
       <TopupsPanel />
+      <WithdrawalsPanel />
       <MarginsPanel />
 
       <h2 className="mt-6 mb-2 text-sm font-semibold uppercase tracking-wider text-muted-foreground">Commandes récentes</h2>

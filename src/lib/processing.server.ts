@@ -233,6 +233,10 @@ export async function runTonCheck(): Promise<{ scanned: number; orderMatches: nu
       if (!upd) {
         matchedOrderId = order.id;
         orderMatches++;
+        try {
+          const { creditReferralForOrder } = await import("./referral.server");
+          await creditReferralForOrder(order.id);
+        } catch { /* best-effort */ }
         if (await autoSendEnabled()) {
           const res = await pushToProvider(order.id);
           if (res.ok) pushed++;
