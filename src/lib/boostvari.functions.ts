@@ -741,8 +741,27 @@ export const adminReviewTopup = createServerFn({ method: "POST" })
         throw new Error(credErr.message);
       }
     }
+
+    try {
+      const { data: prof } = await supabaseAdmin
+        .from("profiles").select("username").eq("user_id", row.user_id).maybeSingle();
+      const { data: full } = await supabaseAdmin
+        .from("topup_requests").select("reference").eq("id", data.id).maybeSingle();
+      const { notifyTopupReviewed } = await import("@/lib/telegram.server");
+      await notifyTopupReviewed({
+        reference: full?.reference ?? null,
+        username: prof?.username ?? null,
+        amount_xof: Number(row.amount_xof),
+        approved: data.approve,
+        credited_ton: amountTon,
+        note: data.note?.trim() || null,
+      });
+    } catch (e) {
+      console.error("Telegram notify (topup reviewed) failed:", e);
+    }
     return { ok: true, credited_ton: amountTon };
   });
+
 
 
 // ============ Mode d'envoi fournisseur ============
