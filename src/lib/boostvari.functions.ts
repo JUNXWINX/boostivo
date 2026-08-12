@@ -623,17 +623,34 @@ export const createTopupRequest = createServerFn({ method: "POST" })
     }).parse(d),
   )
   .handler(async ({ context, data }) => {
-    const { error } = await context.supabase.from("topup_requests").insert({
+    const { data: inserted, error } = await context.supabase.from("topup_requests").insert({
       user_id: context.userId,
       country: data.country,
       operator: data.operator,
       phone: data.phone,
       amount_xof: data.amount_xof,
       status: "pending",
-    });
+    }).select("reference").maybeSingle();
     if (error) throw new Error(error.message);
+
+    try {
+      const { data: prof } = await context.supabase
+        .from("profiles").select("username").eq("user_id", context.userId).maybeSingle();
+      const { notifyNewTopup } = await import("@/lib/telegram.server");
+      await notifyNewTopup({
+        reference: inserted?.reference ?? null,
+        username: prof?.username ?? null,
+        country: data.country,
+        operator: data.operator,
+        phone: data.phone,
+        amount_xof: data.amount_xof,
+      });
+    } catch (e) {
+      console.error("Telegram notify (new topup) failed:", e);
+    }
     return { ok: true };
   });
+
 
 export const getMyTopups = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
