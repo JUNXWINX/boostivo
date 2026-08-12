@@ -151,6 +151,9 @@ export type Database = {
           created_at: string
           deposit_memo: string
           preferred_currency: string
+          referral_code: string
+          referral_earnings_ton: number
+          referred_by: string | null
           updated_at: string
           user_id: string
           username: string
@@ -160,6 +163,9 @@ export type Database = {
           created_at?: string
           deposit_memo: string
           preferred_currency?: string
+          referral_code: string
+          referral_earnings_ton?: number
+          referred_by?: string | null
           updated_at?: string
           user_id: string
           username: string
@@ -169,11 +175,55 @@ export type Database = {
           created_at?: string
           deposit_memo?: string
           preferred_currency?: string
+          referral_code?: string
+          referral_earnings_ton?: number
+          referred_by?: string | null
           updated_at?: string
           user_id?: string
           username?: string
         }
         Relationships: []
+      }
+      referral_commissions: {
+        Row: {
+          amount_ton: number
+          created_at: string
+          id: string
+          order_amount_ton: number
+          order_id: string
+          percent: number
+          referee_id: string
+          referrer_id: string
+        }
+        Insert: {
+          amount_ton: number
+          created_at?: string
+          id?: string
+          order_amount_ton: number
+          order_id: string
+          percent?: number
+          referee_id: string
+          referrer_id: string
+        }
+        Update: {
+          amount_ton?: number
+          created_at?: string
+          id?: string
+          order_amount_ton?: number
+          order_id?: string
+          percent?: number
+          referee_id?: string
+          referrer_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "referral_commissions_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       services: {
         Row: {
@@ -354,6 +404,66 @@ export type Database = {
         }
         Relationships: []
       }
+      withdrawals: {
+        Row: {
+          admin_note: string | null
+          amount_ton: number
+          amount_xof: number | null
+          country: string | null
+          created_at: string
+          crypto_address: string | null
+          crypto_asset: string | null
+          holder_name: string | null
+          id: string
+          method: string
+          operator: string | null
+          phone: string | null
+          processed_at: string | null
+          reference: string | null
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          admin_note?: string | null
+          amount_ton: number
+          amount_xof?: number | null
+          country?: string | null
+          created_at?: string
+          crypto_address?: string | null
+          crypto_asset?: string | null
+          holder_name?: string | null
+          id?: string
+          method: string
+          operator?: string | null
+          phone?: string | null
+          processed_at?: string | null
+          reference?: string | null
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          admin_note?: string | null
+          amount_ton?: number
+          amount_xof?: number | null
+          country?: string | null
+          created_at?: string
+          crypto_address?: string | null
+          crypto_asset?: string | null
+          holder_name?: string | null
+          id?: string
+          method?: string
+          operator?: string | null
+          phone?: string | null
+          processed_at?: string | null
+          reference?: string | null
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
@@ -363,11 +473,20 @@ export type Database = {
         Args: { _amount: number; _user: string }
         Returns: undefined
       }
+      credit_referral: {
+        Args: { _amount: number; _user: string }
+        Returns: undefined
+      }
       debit_balance: {
         Args: { _amount: number; _user: string }
         Returns: boolean
       }
+      debit_referral: {
+        Args: { _amount: number; _user: string }
+        Returns: boolean
+      }
       generate_deposit_memo: { Args: never; Returns: string }
+      generate_referral_code: { Args: never; Returns: string }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -376,6 +495,10 @@ export type Database = {
         Returns: boolean
       }
       is_username_available: { Args: { _username: string }; Returns: boolean }
+      transfer_referral_to_balance: {
+        Args: { _amount: number; _user: string }
+        Returns: boolean
+      }
     }
     Enums: {
       app_role: "admin" | "user"
