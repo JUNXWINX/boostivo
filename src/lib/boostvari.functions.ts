@@ -229,9 +229,40 @@ export const createOrder = createServerFn({ method: "POST" })
       } catch (e) {
         console.error("[order] push failed", e);
       }
+      // Commission de parrainage (10%) dès que la commande est payée
+      try {
+        const { creditReferralForOrder } = await import("./referral.server");
+        await creditReferralForOrder(inserted.id);
+      } catch (e) {
+        console.error("[order] referral credit failed", e);
+      }
     }
 
-
+    // Notification Telegram (bot Commandes)
+    try {
+      const { notifyNewOrder } = await import("./telegram.server");
+      let username: string | null = null;
+      if (userId) {
+        const { data: prof } = await supabaseAdmin
+          .from("profiles").select("username").eq("user_id", userId).maybeSingle();
+        username = prof?.username ?? null;
+      }
+      const { data: svcInfo } = await supabaseAdmin
+        .from("services").select("name, platform").eq("id", data.service_id).maybeSingle();
+      await notifyNewOrder({
+        public_code: inserted.public_code,
+        username,
+        service: svcInfo?.name ?? null,
+        platform: svcInfo?.platform ?? null,
+        link: data.link,
+        quantity: data.quantity,
+        amount_ton: amount,
+        status: dispatch?.ok ? "sent" : inserted.status,
+        paid_with_balance: usedBalance,
+      });
+    } catch (e) {
+      console.error("[order] telegram notify failed", e);
+    }
 
     return {
       id: inserted.id,
