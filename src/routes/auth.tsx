@@ -30,6 +30,21 @@ function AuthPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
+  const [refCode, setRefCode] = useState("");
+
+  // Code de parrainage depuis l'URL (?ref=CODE) — conservé jusqu'à l'inscription
+  useEffect(() => {
+    try {
+      const fromUrl = new URLSearchParams(window.location.search).get("ref");
+      if (fromUrl) {
+        localStorage.setItem("boostivo:ref", fromUrl.toUpperCase());
+        setRefCode(fromUrl.toUpperCase());
+        setMode("signup");
+      } else {
+        setRefCode(localStorage.getItem("boostivo:ref") ?? "");
+      }
+    } catch { /* noop */ }
+  }, []);
 
   // username availability
   const checkFn = useServerFn(checkUsername);
@@ -59,10 +74,11 @@ function AuthPage() {
           email, password,
           options: {
             emailRedirectTo: window.location.origin + "/",
-            data: { username: username.trim() },
+            data: { username: username.trim(), ...(refCode ? { ref: refCode } : {}) },
           },
         });
         if (e1) throw e1;
+        try { localStorage.removeItem("boostivo:ref"); } catch { /* noop */ }
         setInfo("Compte créé ! Vérifiez votre boîte mail pour confirmer votre adresse, puis connectez-vous.");
         setMode("login");
       } else if (mode === "login") {
@@ -95,6 +111,11 @@ function AuthPage() {
         </div>
 
         <form onSubmit={submit} className="space-y-3">
+          {mode === "signup" && refCode && (
+            <p className="rounded-lg bg-emerald-50 px-3 py-2 text-xs text-emerald-700">
+              🎁 Vous êtes parrainé — code <strong className="font-mono">{refCode}</strong>
+            </p>
+          )}
           {mode === "signup" && (
             <div>
               <label htmlFor="auth-username" className="mb-1 block text-xs font-semibold">Nom d'utilisateur</label>

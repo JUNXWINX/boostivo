@@ -26,6 +26,7 @@ export function AppShell({ children, right }: { children: ReactNode; right?: Rea
           <Link to="/" className="rounded-lg px-2.5 py-1 text-foreground/80 hover:bg-white/60" activeOptions={{ exact: true }} activeProps={{ className: "bg-white/70 text-foreground shadow-sm" }}>Acheter</Link>
           <Link to="/orders" className="rounded-lg px-2.5 py-1 text-foreground/80 hover:bg-white/60" activeProps={{ className: "bg-white/70 text-foreground shadow-sm" }}>Mes commandes</Link>
             <Link to="/wallet" className="rounded-lg px-2.5 py-1 text-foreground/80 hover:bg-white/60" activeProps={{ className: "bg-white/70 text-foreground shadow-sm" }}>Portefeuille</Link>
+            <Link to="/referral" className="rounded-lg px-2.5 py-1 text-foreground/80 hover:bg-white/60" activeProps={{ className: "bg-white/70 text-foreground shadow-sm" }}>Parrainage</Link>
             <Link to="/recharges" className="rounded-lg px-2.5 py-1 text-foreground/80 hover:bg-white/60" activeProps={{ className: "bg-white/70 text-foreground shadow-sm" }}>Mes recharges</Link>
         </nav>
       </header>
