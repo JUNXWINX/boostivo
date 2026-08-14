@@ -40,7 +40,8 @@ export async function creditReferralForOrder(orderId: string): Promise<{ referre
     const referrer = prof?.referred_by as string | null | undefined;
     if (!referrer || referrer === order.user_id) return null;
 
-    const amount = round6((Number(order.amount_ton) * REFERRAL_PERCENT) / 100);
+    const percent = await getReferralPercent();
+    const amount = round6((Number(order.amount_ton) * percent) / 100);
     if (!isFinite(amount) || amount <= 0) return null;
 
     const { error } = await supabaseAdmin.from("referral_commissions").insert({
@@ -49,7 +50,7 @@ export async function creditReferralForOrder(orderId: string): Promise<{ referre
       order_id: order.id,
       order_amount_ton: Number(order.amount_ton),
       amount_ton: amount,
-      percent: REFERRAL_PERCENT,
+      percent,
     });
     if (error) return null; // déjà créditée (unique order_id) ou erreur
 
