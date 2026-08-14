@@ -14,6 +14,74 @@ export type Database = {
   }
   public: {
     Tables: {
+      announcement_reads: {
+        Row: {
+          announcement_id: string
+          created_at: string
+          id: string
+          popup_dismissed_at: string | null
+          read_at: string | null
+          user_id: string
+        }
+        Insert: {
+          announcement_id: string
+          created_at?: string
+          id?: string
+          popup_dismissed_at?: string | null
+          read_at?: string | null
+          user_id: string
+        }
+        Update: {
+          announcement_id?: string
+          created_at?: string
+          id?: string
+          popup_dismissed_at?: string | null
+          read_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "announcement_reads_announcement_id_fkey"
+            columns: ["announcement_id"]
+            isOneToOne: false
+            referencedRelation: "announcements"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      announcements: {
+        Row: {
+          active: boolean
+          body: string
+          created_at: string
+          created_by: string | null
+          id: string
+          level: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          body: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          level?: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          body?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          level?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       deposits: {
         Row: {
           amount_ton: number

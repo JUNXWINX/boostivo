@@ -823,8 +823,9 @@ export const getMyReferral = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { loadRates, MIN_WITHDRAW_XOF, MIN_WITHDRAW_USD, REFERRAL_PERCENT } =
+    const { loadRates, MIN_WITHDRAW_XOF, MIN_WITHDRAW_USD, getReferralPercent } =
       await import("./referral.server");
+    const REFERRAL_PERCENT = await getReferralPercent();
 
     const { data: prof, error } = await supabaseAdmin
       .from("profiles")
@@ -1074,6 +1075,161 @@ export const adminReviewWithdrawal = createServerFn({ method: "POST" })
       });
     } catch (e) {
       console.error("Telegram notify (withdrawal reviewed) failed:", e);
+    }
+    return { ok: true };
+  });
+
+// ============ Réglage du pourcentage de parrainage ============
+export const getReferralPercentSetting = createServerFn({ method: "GET" }).handler(async () => {
+  const { getReferralPercent } = await import("./referral.server");
+  return { percent: await getReferralPercent() };
+});
+
+export const adminSetReferralPercent = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) => z.object({ percent: z.number().min(0).max(90) }).parse(d))
+  .handler(async ({ context, data }) => {
+    await assertAdmin(context);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const percent = Math.round(data.percent * 100) / 100;
+    const { error } = await supabaseAdmin
+      .from("settings")
+      .upsert({ key: "referral_percent", value: String(percent) }, { onConflict: "key" });
+    if (error) throw new Error(error.message);
+    return { ok: true, percent };
+  });
+
+// ============ Annonces & notifications ============
+const announcementSchema = z.object({
+  id: z.string().uuid().optional(),
+  title: z.string().min(2).max(120),
+  body: z.string().min(2).max(2000),
+  level: z.enum(["info", "success", "warning"]).default("info"),
+  active: z.boolean().default(true),
+});
+
+export const adminListAnnouncements = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    await assertAdmin(context);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data, error } = await supabaseAdmin
+      .from("announcements")
+      .select("id, title, body, level, active, created_at")
+      .order("created_at", { ascending: false })
+      .limit(100);
+    if (error) throw new Error(error.message);
+    return data ?? [];
+  });
+
+export const adminSaveAnnouncement = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) => announcementSchema.parse(d))
+  .handler(async ({ context, data }) => {
+    await assertAdmin(context);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const payload = {
+      title: data.title.trim(),
+      body: data.body.trim(),
+      level: data.level,
+      active: data.active,
+      created_by: context.userId,
+    };
+    const q = data.id
+      ? supabaseAdmin.from("announcements").update(payload).eq("id", data.id).select("id").maybeSingle()
+      : supabaseAdmin.from("announcements").insert(payload).select("id").maybeSingle();
+    const { data: row, error } = await q;
+    if (error) throw new Error(error.message);
+    return { ok: true, id: row?.id ?? null };
+  });
+
+export const adminDeleteAnnouncement = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) => z.object({ id: z.string().uuid() }).parse(d))
+  .handler(async ({ context, data }) => {
+    await assertAdmin(context);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { error } = await supabaseAdmin.from("announcements").delete().eq("id", data.id);
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
+/** Notifications de l'utilisateur : annonces actives + état de lecture. */
+export const getMyNotifications = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const [{ data: anns, error }, { data: reads }] = await Promise.all([
+      supabaseAdmin
+        .from("announcements")
+        .select("id, title, body, level, created_at")
+        .eq("active", true)
+        .order("created_at", { ascending: false })
+        .limit(50),
+      supabaseAdmin
+        .from("announcement_reads")
+        .select("announcement_id, popup_dismissed_at, read_at")
+        .eq("user_id", context.userId),
+    ]);
+    if (error) throw new Error(error.message);
+    const map = new Map((reads ?? []).map((r) => [r.announcement_id, r]));
+    const items = (anns ?? []).map((a) => {
+      const r = map.get(a.id);
+      return {
+        ...a,
+        read: !!r?.read_at,
+        popup_dismissed: !!r?.popup_dismissed_at,
+      };
+    });
+    return {
+      items,
+      unread: items.filter((i) => !i.read).length,
+      popup: items.find((i) => !i.popup_dismissed) ?? null,
+    };
+  });
+
+export const markAnnouncement = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) =>
+    z.object({
+      id: z.string().uuid(),
+      dismiss_popup: z.boolean().optional(),
+      read: z.boolean().optional(),
+    }).parse(d),
+  )
+  .handler(async ({ context, data }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const now = new Date().toISOString();
+    const { error } = await supabaseAdmin.from("announcement_reads").upsert(
+      {
+        announcement_id: data.id,
+        user_id: context.userId,
+        ...(data.dismiss_popup ? { popup_dismissed_at: now } : {}),
+        ...(data.read ? { read_at: now } : {}),
+      },
+      { onConflict: "announcement_id,user_id" },
+    );
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
+export const markAllNotificationsRead = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const now = new Date().toISOString();
+    const { data: anns } = await supabaseAdmin
+      .from("announcements").select("id").eq("active", true);
+    const rows = (anns ?? []).map((a) => ({
+      announcement_id: a.id,
+      user_id: context.userId,
+      read_at: now,
+    }));
+    if (rows.length) {
+      const { error } = await supabaseAdmin
+        .from("announcement_reads")
+        .upsert(rows, { onConflict: "announcement_id,user_id" });
+      if (error) throw new Error(error.message);
     }
     return { ok: true };
   });
