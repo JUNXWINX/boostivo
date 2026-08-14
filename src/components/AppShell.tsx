@@ -4,6 +4,8 @@ import type { ReactNode } from "react";
 import { AssistantChat } from "./AssistantChat";
 import { BalancePill } from "./BalancePill";
 import { CurrencySwitcher } from "./CurrencySwitcher";
+import { Notifications } from "./Notifications";
+
 
 export function AppShell({ children, right }: { children: ReactNode; right?: ReactNode }) {
   return (
