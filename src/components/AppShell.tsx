@@ -21,6 +21,7 @@ export function AppShell({ children, right }: { children: ReactNode; right?: Rea
           <div className="flex items-center gap-2">
             <CurrencySwitcher />
             <BalancePill />
+            <Notifications />
             {right}
           </div>
         </div>
