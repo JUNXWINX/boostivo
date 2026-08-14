@@ -18,9 +18,9 @@ export const Route = createFileRoute("/_authenticated/referral")({
   head: () => ({
     meta: [
       { title: "Parrainage — Boostivo" },
-      { name: "description", content: "Parrainez vos amis sur Boostivo et gagnez 10% sur toutes leurs commandes. Transférez vos gains vers votre solde ou retirez-les." },
+      { name: "description", content: "Parrainez vos amis sur Boostivo et gagnez une commission sur toutes leurs commandes. Transférez vos gains vers votre solde ou retirez-les." },
       { property: "og:title", content: "Programme de parrainage Boostivo" },
-      { property: "og:description", content: "Gagnez 10% sur chaque commande de vos filleuls." },
+      { property: "og:description", content: "Gagnez une commission sur chaque commande de vos filleuls." },
       { name: "robots", content: "noindex" },
     ],
   }),
