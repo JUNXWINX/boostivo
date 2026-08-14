@@ -823,8 +823,9 @@ export const getMyReferral = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { loadRates, MIN_WITHDRAW_XOF, MIN_WITHDRAW_USD, REFERRAL_PERCENT } =
+    const { loadRates, MIN_WITHDRAW_XOF, MIN_WITHDRAW_USD, getReferralPercent } =
       await import("./referral.server");
+    const REFERRAL_PERCENT = await getReferralPercent();
 
     const { data: prof, error } = await supabaseAdmin
       .from("profiles")
